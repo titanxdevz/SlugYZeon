@@ -31,6 +31,10 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
     private SpotifyAudioSourceManager spotify;
     private YouTubeSourceManager youtube;
 
+    public SpotifyAudioSourceManager getSpotify() {
+        return spotify;
+    }
+
     public SlugYZeonPlugin(
             org.springframework.core.env.Environment env,
             SlugYZeonSourcesConfig sourcesConfig,

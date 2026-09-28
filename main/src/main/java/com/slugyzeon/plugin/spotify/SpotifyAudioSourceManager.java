@@ -234,6 +234,74 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
         return AudioReference.NO_TRACK;
     }
 
+    public String getAccessToken() throws IOException {
+        return tokenTracker.getAnonymousAccessToken();
+    }
+
+    public JsonNode fetchColorLyrics(String trackId, String artworkUrl) throws IOException {
+        try {
+            String token = getAccessToken();
+            String url = "https://spclient.wg.spotify.com/color-lyrics/v2/track/" + trackId;
+
+            if (artworkUrl != null && !artworkUrl.isBlank()) {
+                url += "/image/" + java.net.URLEncoder.encode(artworkUrl, java.nio.charset.StandardCharsets.UTF_8);
+            }
+
+            url += "?format=json&vocalRemoval=false&market=from_token";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "Bearer " + token)
+                    .header("User-Agent", "Spotify/9.0.0.2 iOS/18.4 (iPhone15,3)")
+                    .header("App-Platform", "iOS")
+                    .header("Accept", "application/json")
+                    .header("Accept-Language", "en")
+                    .GET().build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 401) {
+                log.debug("Lyrics 401, refreshing token and retrying");
+                token = getAccessToken();
+                request = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .timeout(Duration.ofSeconds(10))
+                        .header("Authorization", "Bearer " + token)
+                        .header("User-Agent", "Spotify/9.0.0.2 iOS/18.4 (iPhone15,3)")
+                        .header("App-Platform", "iOS")
+                        .header("Accept", "application/json")
+                        .header("Accept-Language", "en")
+                        .GET().build();
+                response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            }
+
+            if (response.statusCode() == 404) {
+                return null;
+            }
+            if (response.statusCode() != 200) {
+                log.warn("Color lyrics returned {} for track {}", response.statusCode(), trackId);
+                return null;
+            }
+
+            return mapper.readTree(response.body());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted fetching lyrics", e);
+        }
+    }
+
+    public String resolveTrackIdFromIsrc(String isrc) throws IOException {
+        AudioItem result = getSearch("isrc:" + isrc, false);
+        if (result instanceof AudioPlaylist) {
+            AudioPlaylist playlist = (AudioPlaylist) result;
+            if (!playlist.getTracks().isEmpty()) {
+                return playlist.getTracks().get(0).getIdentifier();
+            }
+        }
+        return null;
+    }
+
     private String getToken() throws IOException {
         return tokenTracker.getAnonymousAccessToken();
     }
