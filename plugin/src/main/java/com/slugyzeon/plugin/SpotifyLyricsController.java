@@ -24,9 +24,9 @@ public class SpotifyLyricsController {
 
     @GetMapping("/color-lyrics")
     public ResponseEntity<String> getColorLyrics(
-            @RequestParam(required = false) String trackId,
-            @RequestParam(required = false) String isrc,
-            @RequestParam(required = false) String artworkUrl) {
+            @RequestParam(name = "trackId", required = false) String trackId,
+            @RequestParam(name = "isrc", required = false) String isrc,
+            @RequestParam(name = "artworkUrl", required = false) String artworkUrl) {
         try {
             SpotifyAudioSourceManager spotify = plugin.getSpotify();
             if (spotify == null) {
