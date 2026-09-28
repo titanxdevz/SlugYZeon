@@ -84,6 +84,7 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
                     spotifyConfig.getAlbumLoadLimit(),
                     spotifyConfig.isResolveArtistsInSearch(),
                     spotifyConfig.isLocalFiles(),
+                    spotifyConfig.getSpDc(),
                     unused -> manager);
         }
         if (sourcesConfig.isYoutube()) {

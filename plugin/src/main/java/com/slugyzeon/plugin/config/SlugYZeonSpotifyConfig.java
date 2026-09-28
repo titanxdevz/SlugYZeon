@@ -11,6 +11,15 @@ public class SlugYZeonSpotifyConfig {
     private int albumLoadLimit = 6;
     private boolean resolveArtistsInSearch = true;
     private boolean localFiles = false;
+    private String spDc;
+
+    public String getSpDc() {
+        return spDc;
+    }
+
+    public void setSpDc(String spDc) {
+        this.spDc = spDc;
+    }
 
     public String getCountryCode() {
         return countryCode;

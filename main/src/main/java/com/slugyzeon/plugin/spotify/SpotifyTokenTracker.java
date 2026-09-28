@@ -41,7 +41,10 @@ public class SpotifyTokenTracker {
     private volatile int cachedNuanceVersion;
     private volatile Instant cachedNuanceExpires;
 
-    public SpotifyTokenTracker() {
+    private final String spDc;
+
+    public SpotifyTokenTracker(String spDc) {
+        this.spDc = spDc;
     }
 
     public String getAnonymousAccessToken() throws IOException {
@@ -99,8 +102,13 @@ public class SpotifyTokenTracker {
                     .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(15))
                     .header("User-Agent", USER_AGENT)
-                    .header("App-Platform", "WebPlayer")
-                    .GET();
+                    .header("App-Platform", "WebPlayer");
+            
+            if (spDc != null && !spDc.isBlank()) {
+                builder.header("Cookie", "sp_dc=" + spDc);
+            }
+            
+            builder.GET();
 
             HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
@@ -142,12 +150,16 @@ public class SpotifyTokenTracker {
 
     private long fetchServerTime() throws IOException {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(SPOTIFY_SERVER_TIME))
                     .timeout(Duration.ofSeconds(10))
-                    .header("User-Agent", USER_AGENT)
-                    .GET()
-                    .build();
+                    .header("User-Agent", USER_AGENT);
+
+            if (spDc != null && !spDc.isBlank()) {
+                builder.header("Cookie", "sp_dc=" + spDc);
+            }
+
+            HttpRequest request = builder.GET().build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
