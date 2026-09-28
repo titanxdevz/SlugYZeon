@@ -43,15 +43,13 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     private static final String PLAYLIST_HASH = "7982b11e21535cd2594badc40030b745671b61a1fa66766e569d45e6364f3422";
     private static final String ARTIST_HASH = "dd14c6043d8127b56c5acbe534f6b3c58714f0c26bc6ad41776079ed52833a8f";
     private static final String RECOMMENDATIONS_HASH = "c77098ee9d6ee8ad3eb844938722db60570d040b49f41f5ec6e7be9160a7c86b";
-    private static final String HASHES_URL = "https://gist.githubusercontent.com/saraansx/c50367808cbbf6ea7352920e4b556ac3/raw/0c262af0e0cebba07d738848512463a69752118f/spotify_hashes.json";
 
-    private volatile String searchHash = SEARCH_HASH;
-    private volatile String trackHash = TRACK_HASH;
-    private volatile String albumHash = ALBUM_HASH;
-    private volatile String playlistHash = PLAYLIST_HASH;
-    private volatile String artistHash = ARTIST_HASH;
-    private volatile String recommendationsHash = RECOMMENDATIONS_HASH;
-    private volatile boolean hashesLoaded = false;
+    private String searchHash = SEARCH_HASH;
+    private String trackHash = TRACK_HASH;
+    private String albumHash = ALBUM_HASH;
+    private String playlistHash = PLAYLIST_HASH;
+    private String artistHash = ARTIST_HASH;
+    private String recommendationsHash = RECOMMENDATIONS_HASH;
     private final java.util.Map<String, String> isrcCache = java.util.Collections.synchronizedMap(
             new java.util.LinkedHashMap<String, String>(50000, 0.75f, true) {
                 @Override
@@ -90,54 +88,8 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
         this.albumPageLimit = albumPageLimit > 0 ? albumPageLimit : 6;
         this.resolveArtistsInSearch = resolveArtistsInSearch;
         this.localFiles = localFiles;
-        loadRemoteHashes();
-        hashScheduler.scheduleAtFixedRate(this::loadRemoteHashes, 12, 12, java.util.concurrent.TimeUnit.HOURS);
     }
 
-    private final java.util.concurrent.ScheduledExecutorService hashScheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "SpotifyHashUpdater");
-        thread.setDaemon(true);
-        return thread;
-    });
-
-    private void loadRemoteHashes() {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(HASHES_URL))
-                    .header("User-Agent", USER_AGENT)
-                    .header("Accept", "application/json")
-                    .timeout(Duration.ofSeconds(8))
-                    .GET().build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200 && response.body() != null) {
-                JsonNode hashes = mapper.readTree(response.body());
-
-                String s = hashes.path("Search").path("searchDesktop").asText(null);
-                if (s != null && !s.isEmpty())
-                    searchHash = s;
-
-                String t = hashes.path("Track").path("getTrack").asText(null);
-                if (t != null && !t.isEmpty())
-                    trackHash = t;
-
-                String a = hashes.path("Album").path("getAlbum").asText(null);
-                if (a != null && !a.isEmpty())
-                    albumHash = a;
-
-                String p = hashes.path("Playlist").path("fetchPlaylist").asText(null);
-                if (p != null && !p.isEmpty())
-                    playlistHash = p;
-
-                String ar = hashes.path("Artist").path("queryArtistOverview").asText(null);
-                if (ar != null && !ar.isEmpty())
-                    artistHash = ar;
-
-                hashesLoaded = true;
-            }
-        } catch (Exception e) {
-        }
-    }
 
     @Override
     public AudioPlayerManager getAudioPlayerManager() {
