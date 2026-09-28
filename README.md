@@ -79,6 +79,7 @@ plugins:
       pandora: false
       spotify: false
     spotify:
+      spDc: "YOUR_SP_DC_COOKIE" # Required to fetch lyrics (works with free or premium accounts)
       countryCode: "US" # the country code for filtering artist top tracks
       playlistLoadLimit: 6 # The number of pages at 100 tracks each
       albumLoadLimit: 6 # The number of pages at 50 tracks each
@@ -118,6 +119,11 @@ GET /v4/loadtracks?identifier=https://open.spotify.com/track/7qiZfU4dY1lWllzX7mP
 GET /v4/loadtracks?identifier=https://open.spotify.com/album/1ATL5GLyefJaxhQzSPVrLX
 GET /v4/loadtracks?identifier=https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
 GET /v4/loadtracks?identifier=https://open.spotify.com/artist/1Xyo4u8uXC1ZmMpatF05PJ
+
+# color lyrics (REST API)
+GET /v4/spotify/color-lyrics?trackId=7qiZfU4dY1lWllzX7mPBI3
+GET /v4/spotify/color-lyrics?isrc=USUM72400086
+GET /v4/spotify/color-lyrics?trackId=7qiZfU4dY1lWllzX7mPBI3&artworkUrl=https://i.scdn.co/image/...
 ```
 
 ### Gaana
