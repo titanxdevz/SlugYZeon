@@ -66,20 +66,20 @@ lavalink:
 ```yaml
 plugins:
   slugyzeon:
-    # Providers used for resolving mirrored tracks like Spotify/Pandora
-    providers:
-      - "dzisrc:%ISRC%"
-      - "ytsearch:\"%ISRC%\""
-      - "ytmsearch:%QUERY%"
-      - "ytsearch:%QUERY%"
+    providers: # Custom providers for track loading. This is the default
+      # - "dzisrc:%ISRC%" # Deezer ISRC provider
+      # - "dzsearch:%QUERY%" # Deezer search provider
+      - "ytsearch:\"%ISRC%\"" # Will be ignored if track does not have an ISRC. See https://en.wikipedia.org/wiki/International_Standard_Recording_Code
+      - "ytsearch:%QUERY%" # Will be used if track has no ISRC or no track could be found for the ISRC
+      #  you can add multiple other fallback sources here
     sources:
-      # Set to true to enable the specific source
-      gaana: false
-      amazonmusic: false
-      pandora: false
-      spotify: false
+      gaana: false # Enable Gaana source
+      amazonmusic: false # Enable Amazon Music source
+      spotify: false # Enable Spotify source
+      pandora: false # Enable Pandora source
+      youtube: false # Enable YouTube-SlugYZeon source (requires the new Youtube Source plugin)
     spotify:
-      spDc: "YOUR_SP_DC_COOKIE" # Required to fetch lyrics (works with free or premium accounts)
+      spDc: "your spDc cookie" # Required to fetch lyrics (works with free or premium accounts)
       countryCode: "US" # the country code for filtering artist top tracks
       playlistLoadLimit: 6 # The number of pages at 100 tracks each
       albumLoadLimit: 6 # The number of pages at 50 tracks each
@@ -97,7 +97,7 @@ plugins:
       albumLoadLimit: 50
       artistLoadLimit: 50
     pandora:
-      # csrfToken: "your csrftoken" # Manual CSRF cookie from pandora.com (Only works if node is hosted inside the US)
+      csrfToken: "your csrftoken" # Manual CSRF cookie from pandora.com (Only works if node is hosted inside the US)
       searchLimit: 6
 ```
 
@@ -207,35 +207,6 @@ GET /v4/loadtracks?identifier=https://www.pandora.com/station/STxxxxxx
 - **[saraansx](https://github.com/saraansx)** — For help with Spotify integration.
 - **[lavalink-devs](https://github.com/lavalink-devs/lavalink-plugin-template)** — For providing the official Lavalink plugin template.
 - **[topi314 / LavaSrc](https://github.com/topi314/LavaSrc)** — For the foundational mirroring architecture and code structure.
-
----
-
-## YouTube CDN Integration
-
-> [!TIP]
-> SlugYZeon now supports a high-performance, globally distributed YouTube CDN. Instead of downloading directly from YouTube and hitting rate-limits, you can host the `slugyzeon-ytcdn` Golang server. The plugin will automatically stream from your private CDN, and silently upload new tracks in the background!
-
-### Setup Guide
-
-1. **Host the Go CDN:** Clone and run the `slugyzeon-ytcdn` Golang server on a fast VPS or local machine.
-2. **Configure `.env`:** Inside your Go server, generate a highly secure `MASTER_KEY` and set it in your `.env` file.
-3. **Link to Lavalink:** Update your Lavalink `application.yml` with the CDN URL and Master Key exactly as shown below:
-
-```yaml
-plugins:
-  slugyzeon:
-    sources:
-      youtube: true
-    youtube:
-      apiUrl: "http://localhost:3000" # The base URL of your SlugYZeon-YTCDN Golang server
-      masterKey: "SUPER_SECRET_MASTER_KEY_CHANGE_ME" # The secret master key configured in your CDN's .env file
-```
-
-### Autonomous 3-Stage Routing
-
-SlugYZeon implements a highly resilient, fully autonomous 3-stage routing architecture for YouTube playback. This system is specifically designed to eliminate IP blocks, completely bypass YouTube rate limits, and guarantee zero-downtime audio streaming for your Lavalink nodes. The entire process happens invisibly in the background, ensuring your users never experience buffering or playback failures.
-
-When a track is requested, the plugin instantly queries your private Golang CDN. If the track is already cached, it bypasses external networks entirely and streams the audio instantly with zero buffering. If the CDN cache is empty or the connection fails, the plugin dynamically intercepts the request and routes the audio stream directly through a high-speed, secure backend network. Finally, if all high-speed routes fail, it securely hands the track over to Lavalink's native YouTube engine to play normally while simultaneously triggering a lightweight background thread to download and cache the track to your CDN for the next listener.
 
 ---
 
