@@ -92,10 +92,23 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
                     unused -> manager);
         }
         if (sourcesConfig.isYoutube()) {
-            if (youtubeConfig.getApiUrl() != null && !youtubeConfig.getApiUrl().trim().isEmpty() &&
-                youtubeConfig.getMasterKey() != null && !youtubeConfig.getMasterKey().trim().isEmpty()) {
-                this.youtube = new YouTubeSourceManager(youtubeConfig.getApiUrl(), youtubeConfig.getMasterKey(), unused -> manager);
+            if (hasNewYoutubeSource()) {
+                if (youtubeConfig.getApiUrl() != null && !youtubeConfig.getApiUrl().trim().isEmpty() &&
+                    youtubeConfig.getMasterKey() != null && !youtubeConfig.getMasterKey().trim().isEmpty()) {
+                    this.youtube = new YouTubeSourceManager(youtubeConfig.getApiUrl(), youtubeConfig.getMasterKey(), unused -> manager);
+                }
+            } else {
+                throw new IllegalStateException("SlugYZeon Youtube Source requires the new Youtube Source plugin to be enabled.");
             }
+        }
+    }
+
+    private boolean hasNewYoutubeSource() {
+        try {
+            Class.forName("dev.lavalink.youtube.YoutubeAudioSourceManager");
+            return true;
+        } catch (ClassNotFoundException ignored) {
+            return false;
         }
     }
 
