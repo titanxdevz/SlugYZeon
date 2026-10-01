@@ -76,10 +76,30 @@ public class YouTubeTrack extends DelegatedAudioTrack {
                 processDelegate(fallback, executor);
                 return;
             } catch (Exception e) {
-                if (sourceManager.isMirror() && !trackInfo.isStream) {
-                    boolean mirrored = tryMirrorPlayback(executor);
-                    if (mirrored) {
-                        return;
+                if (!sourceManager.isMirror() || trackInfo.isStream) {
+                    throw e;
+                }
+
+                AudioPlayerManager manager = sourceManager.getAudioPlayerManager().apply(null);
+                if (manager == null) throw e;
+
+                java.util.Set<String> activeSources = new java.util.HashSet<>();
+                for (AudioSourceManager sm : manager.getSourceManagers()) {
+                    activeSources.add(sm.getSourceName());
+                }
+
+                for (java.util.Map.Entry<String, String> entry : MIRROR_SOURCES.entrySet()) {
+                    if (!activeSources.contains(entry.getKey())) continue;
+                    try {
+                        AudioItem item = loadItemSync(manager, entry.getValue() + cleanTitle(trackInfo.title));
+                        if (item instanceof AudioPlaylist && !((AudioPlaylist) item).getTracks().isEmpty()) {
+                            item = ((AudioPlaylist) item).getTracks().get(0);
+                        }
+                        if (item instanceof InternalAudioTrack) {
+                            processDelegate((InternalAudioTrack) item, executor);
+                            return;
+                        }
+                    } catch (Exception ignored) {
                     }
                 }
                 throw e;
@@ -91,43 +111,6 @@ public class YouTubeTrack extends DelegatedAudioTrack {
                 FriendlyException.Severity.SUSPICIOUS,
                 new RuntimeException("Video " + videoId));
     }
-
-    private boolean tryMirrorPlayback(LocalAudioTrackExecutor executor) {
-        String query = cleanTitle(trackInfo.title);
-        AudioPlayerManager manager = sourceManager.getAudioPlayerManager().apply(null);
-        
-        java.util.Set<String> activeSources = new java.util.HashSet<>();
-        if (manager != null) {
-            for (AudioSourceManager sm : manager.getSourceManagers()) {
-                activeSources.add(sm.getSourceName());
-            }
-        }
-        
-        for (java.util.Map.Entry<String, String> entry : MIRROR_SOURCES.entrySet()) {
-            if (activeSources.contains(entry.getKey())) {
-                String prefix = entry.getValue();
-                try {
-                    AudioItem item = loadItemSync(manager, prefix + query);
-                    if (item instanceof AudioPlaylist) {
-                        AudioPlaylist playlist = (AudioPlaylist) item;
-                        if (!playlist.getTracks().isEmpty()) {
-                            AudioTrack mirrorTrack = playlist.getTracks().get(0);
-                            if (mirrorTrack instanceof InternalAudioTrack) {
-                                processDelegate((InternalAudioTrack) mirrorTrack, executor);
-                                return true;
-                            }
-                        }
-                    } else if (item instanceof InternalAudioTrack) {
-                        processDelegate((InternalAudioTrack) item, executor);
-                        return true;
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-        }
-        return false;
-    }
-
 
     private AudioItem loadItemSync(AudioPlayerManager manager, String reference) throws Exception {
         CompletableFuture<AudioItem> future = new CompletableFuture<>();
