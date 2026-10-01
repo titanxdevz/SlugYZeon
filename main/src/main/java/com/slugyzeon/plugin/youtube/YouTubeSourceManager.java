@@ -178,25 +178,29 @@ public class YouTubeSourceManager implements AudioSourceManager {
             try {
                 OembedData data = fetchOembedData(reference.identifier);
                 if (data != null && data.title != null) {
-                    String query = "ytsearch:" + data.title + (data.authorName != null ? " " + data.authorName : "");
-                    AudioItem searchResult = originalYouTubeSource.loadItem(manager, new AudioReference(query, null));
-                    
-                    if (searchResult instanceof AudioPlaylist) {
-                        String videoId = extractVideoId(reference.identifier);
-                        for (AudioTrack track : ((AudioPlaylist) searchResult).getTracks()) {
+                    String[] prefixes = {"ytsearch:", "ytmsearch:"};
+                    String query = data.title + (data.authorName != null ? " " + data.authorName : "");
+                    for (String prefix : prefixes) {
+                        AudioItem searchResult = originalYouTubeSource.loadItem(manager, new AudioReference(prefix + query, null));
+                        
+                        if (searchResult instanceof AudioPlaylist) {
+                            String videoId = extractVideoId(reference.identifier);
+                            for (AudioTrack track : ((AudioPlaylist) searchResult).getTracks()) {
+                                if (track.getIdentifier().equals(videoId) && !track.getInfo().isStream) {
+                                    log.info("Resolved \"{}\" via https://youtube.com/oembed", track.getInfo().title);
+                                    result = track;
+                                    break;
+                                }
+                            }
+                        } else if (searchResult instanceof AudioTrack) {
+                            AudioTrack track = (AudioTrack) searchResult;
+                            String videoId = extractVideoId(reference.identifier);
                             if (track.getIdentifier().equals(videoId) && !track.getInfo().isStream) {
                                 log.info("Resolved \"{}\" via https://youtube.com/oembed", track.getInfo().title);
                                 result = track;
-                                break;
                             }
                         }
-                    } else if (searchResult instanceof AudioTrack) {
-                        AudioTrack track = (AudioTrack) searchResult;
-                        String videoId = extractVideoId(reference.identifier);
-                        if (track.getIdentifier().equals(videoId) && !track.getInfo().isStream) {
-                            log.info("Resolved \"{}\" via https://youtube.com/oembed", track.getInfo().title);
-                            result = track;
-                        }
+                        if (result != null) break;
                     }
                 }
             } catch (Exception ignored) {

@@ -47,6 +47,8 @@ public class YouTubeTrack extends DelegatedAudioTrack {
         String cleaned = title.replaceAll("(?i)\\s*[\\(\\[\\{【].*?[\\)\\]\\}】]", "");
         cleaned = cleaned.replaceAll("\\p{IsEmoji}+", "");
         cleaned = cleaned.replaceAll("(?i)\\s*\\b(?:official|music video|lyric video|lyrics|audio|hd|hq|4k|8k|full hd|1080p|720p|live|cover|remaster|remastered|feat\\.?|ft\\.?|remix)\\b.*", "");
+        cleaned = cleaned.replaceAll("\\s*\\|.*", "");
+        cleaned = cleaned.replaceAll("(?i)\\b(?:prod\\.?|produced)\\s+by\\b.*", "");
         cleaned = cleaned.replaceAll("\\s*[-|/:;*]+\\s*$", "");
         cleaned = cleaned.replaceAll("\\s{2,}", " ");
         return cleaned.trim();
