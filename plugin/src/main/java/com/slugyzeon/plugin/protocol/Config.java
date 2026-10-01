@@ -6,6 +6,7 @@ public class Config {
     private AmazonMusicConfig amazonmusic;
     private SpotifyConfig spotify;
     private PandoraConfig pandora;
+    private YouTubeConfig youtube;
 
     public GaanaConfig getGaana() {
         return this.gaana;
@@ -37,6 +38,14 @@ public class Config {
 
     public void setPandora(PandoraConfig pandora) {
         this.pandora = pandora;
+    }
+
+    public YouTubeConfig getYoutube() {
+        return this.youtube;
+    }
+
+    public void setYoutube(YouTubeConfig youtube) {
+        this.youtube = youtube;
     }
 
     public static class GaanaConfig {
@@ -156,6 +165,27 @@ public class Config {
 
         public void setSearchLimit(int searchLimit) {
             this.searchLimit = searchLimit;
+        }
+    }
+
+    public static class YouTubeConfig {
+        private Boolean oembed;
+        private Boolean mirror;
+
+        public Boolean getOembed() {
+            return this.oembed;
+        }
+
+        public void setOembed(Boolean oembed) {
+            this.oembed = oembed;
+        }
+
+        public Boolean getMirror() {
+            return this.mirror;
+        }
+
+        public void setMirror(Boolean mirror) {
+            this.mirror = mirror;
         }
     }
 }

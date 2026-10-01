@@ -19,9 +19,9 @@ public class YouTubeSourceManager implements AudioSourceManager {
 
     private static final Logger log = LoggerFactory.getLogger(YouTubeSourceManager.class);
     private final Function<Void, AudioPlayerManager> audioPlayerManager;
-    private final String apiUrl;
-    private final String masterKey;
     private AudioSourceManager originalYouTubeSource;
+    private boolean oembed = false;
+    private boolean mirror = false;
     private final java.util.concurrent.ExecutorService networkExecutor = java.util.concurrent.Executors.newFixedThreadPool(10);
     private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.ALWAYS).connectTimeout(java.time.Duration.ofSeconds(10)).build();
     private final com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager httpSourceManager = new com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager();
@@ -31,20 +31,12 @@ public class YouTubeSourceManager implements AudioSourceManager {
     }
 
     public YouTubeSourceManager(
-            String apiUrl,
-            String masterKey,
+            boolean oembed,
+            boolean mirror,
             Function<Void, AudioPlayerManager> audioPlayerManager) {
+        this.oembed = oembed;
+        this.mirror = mirror;
         this.audioPlayerManager = audioPlayerManager;
-        this.apiUrl = apiUrl;
-        this.masterKey = masterKey;
-    }
-
-    public String getApiUrl() {
-        return apiUrl;
-    }
-
-    public String getMasterKey() {
-        return masterKey;
     }
 
     public Function<Void, AudioPlayerManager> getAudioPlayerManager() {
@@ -53,6 +45,14 @@ public class YouTubeSourceManager implements AudioSourceManager {
 
     public AudioSourceManager getOriginalYouTubeSource() {
         return originalYouTubeSource;
+    }
+
+    public void setOembed(boolean oembed) {
+        this.oembed = oembed;
+    }
+
+    public void setMirror(boolean mirror) {
+        this.mirror = mirror;
     }
 
     @SuppressWarnings("unchecked")

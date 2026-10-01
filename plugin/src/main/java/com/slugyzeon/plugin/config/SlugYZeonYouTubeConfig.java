@@ -3,28 +3,26 @@ package com.slugyzeon.plugin.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 @ConfigurationProperties(prefix = "plugins.slugyzeon.youtube")
 @Component
 public class SlugYZeonYouTubeConfig {
 
-    private String apiUrl;
-    private String masterKey;
+    private boolean oembed = false;
+    private boolean mirror = false;
 
-    public String getApiUrl() {
-        return apiUrl;
+    public boolean isOembed() {
+        return oembed;
     }
 
-    public void setApiUrl(String apiUrl) {
-        this.apiUrl = apiUrl;
+    public void setOembed(boolean oembed) {
+        this.oembed = oembed;
     }
 
-    public String getMasterKey() {
-        return masterKey;
+    public boolean isMirror() {
+        return mirror;
     }
 
-    public void setMasterKey(String masterKey) {
-        this.masterKey = masterKey;
+    public void setMirror(boolean mirror) {
+        this.mirror = mirror;
     }
 }

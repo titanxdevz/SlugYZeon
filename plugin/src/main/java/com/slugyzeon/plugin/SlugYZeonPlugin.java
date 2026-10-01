@@ -39,10 +39,10 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         SlugYZeonConfig pluginConfig,
         SlugYZeonSourcesConfig sourcesConfig,
         GaanaConfig gaanaConfig,
-        AmazonMusicConfig amazonMusicConfig,
-        SlugYZeonSpotifyConfig spotifyConfig,
         PandoraConfig pandoraConfig,
         SlugYZeonYouTubeConfig youtubeConfig
+        AmazonMusicConfig amazonMusicConfig,
+        SlugYZeonSpotifyConfig spotifyConfig,
     ) {
         log.info("Loading SlugYZeoN plugin...");
         this.sourcesConfig = sourcesConfig;
@@ -94,9 +94,7 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         }
         if (sourcesConfig.isYoutube()) {
             if (hasNewYoutubeSource()) {
-                if (youtubeConfig.getApiUrl() != null && !youtubeConfig.getApiUrl().trim().isEmpty() && youtubeConfig.getMasterKey() != null && !youtubeConfig.getMasterKey().trim().isEmpty()) {
-                    this.youtube = new YouTubeSourceManager(youtubeConfig.getApiUrl(), youtubeConfig.getMasterKey(), unused -> manager);
-                }
+                this.youtube = new YouTubeSourceManager(youtubeConfig.isOembed(), youtubeConfig.isMirror(), unused -> manager);
             } else {
                 throw new IllegalStateException("SlugYZeon Youtube Source requires the new Youtube Source plugin to be enabled.");
             }
@@ -140,6 +138,7 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     public void onApplicationReady() {
         if (this.youtube != null && this.manager != null && this.sourcesConfig.isYoutube()) {
+            log.info("Registering SlugYZeon YouTube source resolver...");
             this.youtube.attachToYouTube(this.manager);
         }
     }
