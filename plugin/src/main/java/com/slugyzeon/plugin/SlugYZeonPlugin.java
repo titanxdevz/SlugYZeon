@@ -27,8 +27,8 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
     private AudioPlayerManager manager;
     private GaanaAudioSourceManager gaana;
     private AmazonMusicAudioSourceManager amazonMusic;
-    private PandoraAudioSourceManager pandora;
     private SpotifyAudioSourceManager spotify;
+    private PandoraAudioSourceManager pandora;
     private YouTubeSourceManager youtube;
 
     public SpotifyAudioSourceManager getSpotify() {
@@ -40,8 +40,8 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         SlugYZeonSourcesConfig sourcesConfig,
         GaanaConfig gaanaConfig,
         AmazonMusicConfig amazonMusicConfig,
-        PandoraConfig pandoraConfig,
         SlugYZeonSpotifyConfig spotifyConfig,
+        PandoraConfig pandoraConfig,
         SlugYZeonYouTubeConfig youtubeConfig
     ) {
         log.info("Loading SlugYZeoN plugin...");
@@ -71,12 +71,6 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
                 this.amazonMusic.setArtistLoadLimit(amazonMusicConfig.getArtistLoadLimit());
             }
         }
-        if (sourcesConfig.isPandora()) {
-            this.pandora = new PandoraAudioSourceManager(pluginConfig.getProviders(), pandoraConfig.getCsrfToken(), unused -> manager);
-            if (pandoraConfig.getSearchLimit() > 0) {
-                this.pandora.setSearchLimit(pandoraConfig.getSearchLimit());
-            }
-        }
         if (sourcesConfig.isSpotify()) {
             this.spotify = new SpotifyAudioSourceManager(pluginConfig.getProviders(), spotifyConfig.getCountryCode(), spotifyConfig.getSpDc(), unused -> manager);
             if (spotifyConfig.getPlaylistLoadLimit() > 0) {
@@ -90,6 +84,12 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
             }
             if (spotifyConfig.isLocalFiles()) {
                 this.spotify.setLocalFiles(spotifyConfig.isLocalFiles());
+            }
+        }
+        if (sourcesConfig.isPandora()) {
+            this.pandora = new PandoraAudioSourceManager(pluginConfig.getProviders(), pandoraConfig.getCsrfToken(), unused -> manager);
+            if (pandoraConfig.getSearchLimit() > 0) {
+                this.pandora.setSearchLimit(pandoraConfig.getSearchLimit());
             }
         }
         if (sourcesConfig.isYoutube()) {
@@ -125,13 +125,13 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
             log.info("Registering Amazon Music audio source manager...");
             manager.registerSourceManager(this.amazonMusic);
         }
-        if (this.pandora != null) {
-            log.info("Registering Pandora audio source manager...");
-            manager.registerSourceManager(this.pandora);
-        }
         if (this.spotify != null && this.sourcesConfig.isSpotify()) {
             log.info("Registering Spotify audio source manager...");
             manager.registerSourceManager(this.spotify);
+        }
+        if (this.pandora != null) {
+            log.info("Registering Pandora audio source manager...");
+            manager.registerSourceManager(this.pandora);
         }
 
         return manager;
@@ -172,18 +172,10 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
             }
         }
 
-        var pandoraConfig = config.getPandora();
-        if (pandoraConfig != null && this.pandora != null) {
-            if (pandoraConfig.getSearchLimit() > 0) {
-                this.pandora.setSearchLimit(pandoraConfig.getSearchLimit());
-            }
-        }
-
         var spotifyConfig = config.getSpotify();
         if (spotifyConfig != null && this.spotify != null) {
             if (spotifyConfig.getSpDc() != null) {
                 this.spotify.setSpDc(spotifyConfig.getSpDc());
-                log.info("Successfully live-updated Spotify spDc cookie.");
             }
             if (spotifyConfig.getPlaylistLoadLimit() > 0) {
                 this.spotify.setPlaylistPageLimit(spotifyConfig.getPlaylistLoadLimit());
@@ -196,6 +188,13 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
             }
             if (spotifyConfig.getLocalFiles() != null) {
                 this.spotify.setLocalFiles(spotifyConfig.getLocalFiles());
+            }
+        }
+
+        var pandoraConfig = config.getPandora();
+        if (pandoraConfig != null && this.pandora != null) {
+            if (pandoraConfig.getSearchLimit() > 0) {
+                this.pandora.setSearchLimit(pandoraConfig.getSearchLimit());
             }
         }
     }
