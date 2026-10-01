@@ -40,9 +40,9 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         SlugYZeonSourcesConfig sourcesConfig,
         GaanaConfig gaanaConfig,
         PandoraConfig pandoraConfig,
-        SlugYZeonYouTubeConfig youtubeConfig
+        SlugYZeonYouTubeConfig youtubeConfig,
         AmazonMusicConfig amazonMusicConfig,
-        SlugYZeonSpotifyConfig spotifyConfig,
+        SlugYZeonSpotifyConfig spotifyConfig
     ) {
         log.info("Loading SlugYZeoN plugin...");
         this.sourcesConfig = sourcesConfig;

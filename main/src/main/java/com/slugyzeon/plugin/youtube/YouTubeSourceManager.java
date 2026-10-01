@@ -22,13 +22,6 @@ public class YouTubeSourceManager implements AudioSourceManager {
     private AudioSourceManager originalYouTubeSource;
     private final boolean oembed;
     private final boolean mirror;
-    private final java.util.concurrent.ExecutorService networkExecutor = java.util.concurrent.Executors.newFixedThreadPool(10);
-    private final java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.ALWAYS).connectTimeout(java.time.Duration.ofSeconds(10)).build();
-    private final com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager httpSourceManager = new com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager();
-
-    public com.sedmelluq.discord.lavaplayer.source.http.HttpAudioSourceManager getHttpSourceManager() {
-        return httpSourceManager;
-    }
 
     public YouTubeSourceManager(
             boolean oembed,
@@ -67,7 +60,6 @@ public class YouTubeSourceManager implements AudioSourceManager {
             if (isYouTube) {
                 this.originalYouTubeSource = source;
                 sources.set(i, this);
-                log.info("Attached SlugYZeon-YTCDN to YouTube source {}", source.getClass().getName());
                 return true;
             }
         }
@@ -107,14 +99,6 @@ public class YouTubeSourceManager implements AudioSourceManager {
         return "youtube";
     }
 
-    public java.util.concurrent.ExecutorService getNetworkExecutor() {
-        return networkExecutor;
-    }
-
-    public java.net.http.HttpClient getHttpClient() {
-        return httpClient;
-    }
-
     @Override
     public AudioItem loadItem(AudioPlayerManager manager, AudioReference reference) {
         if (originalYouTubeSource == null)
@@ -145,23 +129,6 @@ public class YouTubeSourceManager implements AudioSourceManager {
             return result;
         }
 
-        return null;
-    }
-
-    String checkCdnStreamUrl(String videoId) {
-        try {
-            var req = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(apiUrl + "/api/v1/metadata/" + videoId))
-                .header("User-Agent", "SlugYZeon-Node")
-                .timeout(java.time.Duration.ofSeconds(3))
-                .GET().build();
-            var res = httpClient.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
-            
-            if (res.statusCode() == 200 && res.body() != null) {
-                return apiUrl + "/api/v1/stream/" + videoId;
-            }
-        } catch (Exception ignored) {
-        }
         return null;
     }
 
@@ -217,6 +184,5 @@ public class YouTubeSourceManager implements AudioSourceManager {
     public void shutdown() {
         if (originalYouTubeSource != null)
             originalYouTubeSource.shutdown();
-        networkExecutor.shutdownNow();
     }
 }
