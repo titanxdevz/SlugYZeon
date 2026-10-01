@@ -185,6 +185,7 @@ public class YouTubeSourceManager implements AudioSourceManager {
                         String videoId = extractVideoId(reference.identifier);
                         for (AudioTrack track : ((AudioPlaylist) searchResult).getTracks()) {
                             if (track.getIdentifier().equals(videoId) && !track.getInfo().isStream) {
+                                log.info("Resolved \"{}\" via https://youtube.com/oembed", track.getInfo().title);
                                 result = track;
                                 break;
                             }
@@ -193,6 +194,7 @@ public class YouTubeSourceManager implements AudioSourceManager {
                         AudioTrack track = (AudioTrack) searchResult;
                         String videoId = extractVideoId(reference.identifier);
                         if (track.getIdentifier().equals(videoId) && !track.getInfo().isStream) {
+                            log.info("Resolved \"{}\" via https://youtube.com/oembed", track.getInfo().title);
                             result = track;
                         }
                     }

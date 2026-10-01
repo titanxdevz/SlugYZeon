@@ -96,6 +96,7 @@ public class YouTubeTrack extends DelegatedAudioTrack {
                             item = ((AudioPlaylist) item).getTracks().get(0);
                         }
                         if (item instanceof InternalAudioTrack) {
+                            log.info("Playing \"{}\" (Resolved) using {}!", cleanTitle(trackInfo.title), entry.getKey());
                             processDelegate((InternalAudioTrack) item, executor);
                             return;
                         }
