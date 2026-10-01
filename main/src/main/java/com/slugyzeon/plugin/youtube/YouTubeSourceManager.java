@@ -60,6 +60,10 @@ public class YouTubeSourceManager implements AudioSourceManager {
         return audioPlayerManager;
     }
 
+    public boolean isMirror() {
+        return mirror;
+    }
+
     public AudioSourceManager getOriginalYouTubeSource() {
         return originalYouTubeSource;
     }
