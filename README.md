@@ -78,6 +78,9 @@ plugins:
       spotify: false # Enable Spotify source
       pandora: false # Enable Pandora source
       youtube: false # Enable YouTube-SlugYZeon source (requires the new Youtube Source plugin)
+    youtube:
+      oembed: false # Use youtube.com/oembed?url= to resolve tracks
+      mirror: false # Use other sources to mirror tracks if the YouTube plugin fails
     spotify:
       spDc: "your spDc cookie" # Required to fetch lyrics (works with free or premium accounts)
       countryCode: "US" # the country code for filtering artist top tracks
@@ -105,13 +108,8 @@ plugins:
 
 You can dynamically update your configuration at runtime without restarting Lavalink! Simply send a `PATCH` request to the `/v4/slugyzeon/config` endpoint with the new configuration JSON and your Lavalink password in the `Authorization` header.
 
-**Example Request:**
-```http
-PATCH /v4/slugyzeon/config HTTP/1.1
-Host: localhost:2333
-Authorization: YOUR_LAVALINK_PASSWORD
-Content-Type: application/json
-
+**Example Payload:**
+```json
 {
   "spotify": {
     "spDc": "your spDc cookie",
