@@ -25,7 +25,10 @@ import org.slf4j.LoggerFactory;
 public class YouTubeSourceManager implements AudioSourceManager {
 
     private static final Logger log = LoggerFactory.getLogger(YouTubeSourceManager.class);
-    private static final String OEMBED_URL = "https://www.youtube.com/oembed?url=";
+    private static final String oembedUrl = "https://www.youtube.com/oembed?url=";
+    private static final java.util.regex.Pattern VIDEO_ID_PATTERN = java.util.regex.Pattern.compile(
+            "(?i)(?:v=|vi=|v/|vi/|youtu\\.be/|embed/|shorts/)([a-zA-Z0-9_-]{11})"
+    );
     private final Function<Void, AudioPlayerManager> audioPlayerManager;
     private AudioSourceManager originalYouTubeSource;
     private final boolean oembed;
@@ -126,26 +129,17 @@ public class YouTubeSourceManager implements AudioSourceManager {
     }
 
     private String extractVideoId(String url) {
-        try {
-            if (url.contains("youtu.be/")) {
-                return url.substring(url.indexOf("youtu.be/") + 9).split("[?#]")[0];
-            }
-            if (url.contains("v=")) {
-                String[] params = url.substring(url.indexOf("?") + 1).split("&");
-                for (String param : params) {
-                    if (param.startsWith("v=")) {
-                        return param.substring(2);
-                    }
-                }
-            }
-        } catch (Exception ignored) {
+        if (url == null) return null;
+        java.util.regex.Matcher matcher = VIDEO_ID_PATTERN.matcher(url);
+        if (matcher.find()) {
+            return matcher.group(1);
         }
         return null;
     }
 
     private OembedData fetchOembedData(String url) throws Exception {
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(OEMBED_URL + url))
+                .uri(URI.create(oembedUrl + url))
                 .GET()
                 .build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
