@@ -41,7 +41,11 @@ public class SpotifyTokenTracker {
     private volatile int cachedNuanceVersion;
     private volatile Instant cachedNuanceExpires;
 
-    private final String spDc;
+    private volatile String spDc;
+
+    public void setSpDc(String spDc) {
+        this.spDc = spDc;
+    }
 
     public SpotifyTokenTracker(String spDc) {
         this.spDc = spDc;

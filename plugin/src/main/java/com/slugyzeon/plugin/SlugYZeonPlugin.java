@@ -11,8 +11,12 @@ import dev.arbjerg.lavalink.api.AudioPlayerManagerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 @Service
+@RestController
 public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SlugYZeonPlugin.class);
@@ -123,6 +127,29 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
     public void onApplicationReady() {
         if (youtube != null && manager != null) {
             youtube.attachToYouTube(manager);
+        }
+    }
+
+    @PatchMapping("/v4/slugyzeon/config")
+    public void updateConfig(@RequestBody ConfigUpdate config) {
+        if (config.getSpotify() != null && this.spotify != null) {
+            if (config.getSpotify().getSpDc() != null) {
+                this.spotify.setSpDc(config.getSpotify().getSpDc());
+                log.info("Successfully live-updated Spotify spDc cookie.");
+            }
+        }
+    }
+
+    public static class ConfigUpdate {
+        private SpotifyConfig spotify;
+
+        public SpotifyConfig getSpotify() { return spotify; }
+        public void setSpotify(SpotifyConfig spotify) { this.spotify = spotify; }
+
+        public static class SpotifyConfig {
+            private String spDc;
+            public String getSpDc() { return spDc; }
+            public void setSpDc(String spDc) { this.spDc = spDc; }
         }
     }
 }

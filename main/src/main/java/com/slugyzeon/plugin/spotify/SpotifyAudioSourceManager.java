@@ -36,20 +36,6 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     public static final long PREVIEW_LENGTH = 30000;
     public static final String SHARE_URL = "https://spotify.link/";
     public static final String GQL_BASE = "https://api-partner.spotify.com/pathfinder/v2/query";
-
-    private static final String SEARCH_HASH = "4801118d4a100f756e833d33984436a3899cff359c532f8fd3aaf174b60b3b49";
-    private static final String TRACK_HASH = "612585ae06ba435ad26369870deaae23b5c8800a256cd8a57e08eddc25a37294";
-    private static final String ALBUM_HASH = "b9bfabef66ed756e5e13f68a942deb60bd4125ec1f1be8cc42769dc0259b4b10";
-    private static final String PLAYLIST_HASH = "7982b11e21535cd2594badc40030b745671b61a1fa66766e569d45e6364f3422";
-    private static final String ARTIST_HASH = "dd14c6043d8127b56c5acbe534f6b3c58714f0c26bc6ad41776079ed52833a8f";
-    private static final String RECOMMENDATIONS_HASH = "c77098ee9d6ee8ad3eb844938722db60570d040b49f41f5ec6e7be9160a7c86b";
-
-    private String searchHash = SEARCH_HASH;
-    private String trackHash = TRACK_HASH;
-    private String albumHash = ALBUM_HASH;
-    private String playlistHash = PLAYLIST_HASH;
-    private String artistHash = ARTIST_HASH;
-    private String recommendationsHash = RECOMMENDATIONS_HASH;
     private final java.util.Map<String, String> isrcCache = java.util.Collections.synchronizedMap(
             new java.util.LinkedHashMap<String, String>(50000, 0.75f, true) {
                 @Override
@@ -88,6 +74,10 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
         this.albumPageLimit = albumPageLimit > 0 ? albumPageLimit : 6;
         this.resolveArtistsInSearch = resolveArtistsInSearch;
         this.localFiles = localFiles;
+    }
+
+    public void setSpDc(String spDc) {
+        this.tokenTracker.setSpDc(spDc);
     }
 
 
@@ -400,7 +390,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     }
 
     public AudioItem getTrack(String id, boolean preview) throws IOException {
-        JsonNode data = gqlQuery(SpotifyRequestPayload.track(trackHash, id));
+        JsonNode data = gqlQuery(SpotifyRequestPayload.track(id));
         if (data == null)
             return AudioReference.NO_TRACK;
 
@@ -417,7 +407,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     }
 
     public AudioItem getSearch(String query, boolean preview) throws IOException {
-        JsonNode data = gqlQuery(SpotifyRequestPayload.search(searchHash, query));
+        JsonNode data = gqlQuery(SpotifyRequestPayload.search(query));
         if (data == null)
             return AudioReference.NO_TRACK;
 
@@ -494,7 +484,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     }
 
     private AudioItem getGqlRecommendations(String seedTrackId, boolean preview) throws IOException {
-        JsonNode data = gqlQuery(SpotifyRequestPayload.recommendations(recommendationsHash, seedTrackId));
+        JsonNode data = gqlQuery(SpotifyRequestPayload.recommendations(seedTrackId));
         if (data == null)
             return null;
 
@@ -532,7 +522,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     }
 
     public AudioItem getAlbum(String id, boolean preview) throws IOException {
-        JsonNode data = gqlQuery(SpotifyRequestPayload.album(albumHash, id));
+        JsonNode data = gqlQuery(SpotifyRequestPayload.album(id));
         if (data == null)
             return AudioReference.NO_TRACK;
 
@@ -627,7 +617,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     }
 
     public AudioItem getPlaylist(String id, boolean preview) throws IOException {
-        JsonNode data = gqlQuery(SpotifyRequestPayload.playlist(playlistHash, id, 0, 343));
+        JsonNode data = gqlQuery(SpotifyRequestPayload.playlist(id, 0, 343));
         if (data == null)
             return AudioReference.NO_TRACK;
 
@@ -658,7 +648,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
                 final int offset = i * 343;
                 pageFutures[i - 1] = java.util.concurrent.CompletableFuture.runAsync(() -> {
                     try {
-                        JsonNode pageData = gqlQuery(SpotifyRequestPayload.playlist(playlistHash, id, offset, 343));
+                        JsonNode pageData = gqlQuery(SpotifyRequestPayload.playlist(id, offset, 343));
                         if (pageData != null) {
                             JsonNode pageItems = pageData.path("playlistV2").path("content").path("items");
                             if (pageItems.isArray()) {
@@ -717,7 +707,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
     }
 
     public AudioItem getArtist(String id, boolean preview) throws IOException {
-        JsonNode data = gqlQuery(SpotifyRequestPayload.artist(artistHash, id));
+        JsonNode data = gqlQuery(SpotifyRequestPayload.artist(id));
         if (data == null)
             return AudioReference.NO_TRACK;
 

@@ -101,6 +101,24 @@ plugins:
       searchLimit: 6
 ```
 
+### Live Configuration Updates
+
+You can dynamically update your `spDc` cookie at runtime without restarting Lavalink! Simply send a `PATCH` request to the `/v4/slugyzeon/config` endpoint with the new configuration JSON and your Lavalink password in the `Authorization` header.
+
+**Example Request:**
+```http
+PATCH /v4/slugyzeon/config HTTP/1.1
+Host: localhost:2333
+Authorization: YOUR_LAVALINK_PASSWORD
+Content-Type: application/json
+
+{
+  "spotify": {
+    "spDc": "NEW_SP_DC_COOKIE_HERE"
+  }
+}
+```
+
 ---
 
 ## Supported URLs and Queries
