@@ -42,6 +42,16 @@ public class YouTubeTrack extends DelegatedAudioTrack {
         return originalTrack;
     }
 
+    private String cleanTitle(String title) {
+        if (title == null) return "";
+        String cleaned = title.replaceAll("(?i)\\s*[\\(\\[\\{【].*?[\\)\\]\\}】]", "");
+        cleaned = cleaned.replaceAll("\\p{IsEmoji}+", "");
+        cleaned = cleaned.replaceAll("(?i)\\s*\\b(?:official|music video|lyric video|lyrics|audio|hd|hq|4k|8k|full hd|1080p|720p|live|cover|remaster|remastered|feat\\.?|ft\\.?|remix)\\b.*", "");
+        cleaned = cleaned.replaceAll("\\s*[-|/:;*]+\\s*$", "");
+        cleaned = cleaned.replaceAll("\\s{2,}", " ");
+        return cleaned.trim();
+    }
+
     @Override
     public void process(LocalAudioTrackExecutor executor) throws Exception {
         InternalAudioTrack fallback = null;
@@ -83,7 +93,7 @@ public class YouTubeTrack extends DelegatedAudioTrack {
     }
 
     private boolean tryMirrorPlayback(LocalAudioTrackExecutor executor) {
-        String query = trackInfo.title + (trackInfo.author != null ? " " + trackInfo.author : "");
+        String query = cleanTitle(trackInfo.title);
         AudioPlayerManager manager = sourceManager.getAudioPlayerManager().apply(null);
         
         java.util.Set<String> activeSources = new java.util.HashSet<>();
@@ -117,6 +127,7 @@ public class YouTubeTrack extends DelegatedAudioTrack {
         }
         return false;
     }
+
 
     private AudioItem loadItemSync(AudioPlayerManager manager, String reference) throws Exception {
         CompletableFuture<AudioItem> future = new CompletableFuture<>();
