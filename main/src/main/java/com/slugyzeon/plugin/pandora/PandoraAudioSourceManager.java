@@ -32,14 +32,16 @@ public class PandoraAudioSourceManager extends MirroringAudioSourceManager {
 
     private final PandoraApiHandler api;
     private final PandoraTokenTracker tokenTracker;
-    private final int searchLimit;
+    private int searchLimit = 6;
 
-    public PandoraAudioSourceManager(String[] providers, String csrfToken, int searchLimit,
-            Function<Void, AudioPlayerManager> manager) {
+    public PandoraAudioSourceManager(String[] providers, String csrfToken, Function<Void, AudioPlayerManager> manager) {
         super(manager, new DefaultMirroringAudioTrackResolver(providers));
-        this.searchLimit = searchLimit > 0 ? searchLimit : 6;
         this.tokenTracker = new PandoraTokenTracker(this, csrfToken);
         this.api = new PandoraApiHandler(this, tokenTracker);
+    }
+
+    public void setSearchLimit(int searchLimit) {
+        this.searchLimit = searchLimit;
     }
 
     @Override

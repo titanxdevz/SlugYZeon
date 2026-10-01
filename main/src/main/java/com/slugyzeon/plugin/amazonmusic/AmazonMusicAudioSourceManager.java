@@ -34,18 +34,25 @@ public class AmazonMusicAudioSourceManager extends MirroringAudioSourceManager {
             Pattern.CASE_INSENSITIVE);
 
     private final AmazonMusicApiHandler api;
-    private final int playlistLoadLimit;
-    private final int albumLoadLimit;
-    private final int artistLoadLimit;
+    private int playlistLoadLimit = 6;
+    private int albumLoadLimit = 6;
+    private int artistLoadLimit = 6;
 
-    public AmazonMusicAudioSourceManager(String[] providers, String apiUrl,
-            int playlistLoadLimit, int albumLoadLimit, int artistLoadLimit,
-            Function<Void, AudioPlayerManager> manager) {
+    public AmazonMusicAudioSourceManager(String[] providers, String apiUrl, Function<Void, AudioPlayerManager> manager) {
         super(manager, new DefaultMirroringAudioTrackResolver(providers));
-        this.playlistLoadLimit = playlistLoadLimit;
-        this.albumLoadLimit = albumLoadLimit;
-        this.artistLoadLimit = artistLoadLimit;
         this.api = new AmazonMusicApiHandler(apiUrl);
+    }
+
+    public void setPlaylistLoadLimit(int playlistLoadLimit) {
+        this.playlistLoadLimit = playlistLoadLimit;
+    }
+
+    public void setAlbumLoadLimit(int albumLoadLimit) {
+        this.albumLoadLimit = albumLoadLimit;
+    }
+
+    public void setArtistLoadLimit(int artistLoadLimit) {
+        this.artistLoadLimit = artistLoadLimit;
     }
 
     @Override

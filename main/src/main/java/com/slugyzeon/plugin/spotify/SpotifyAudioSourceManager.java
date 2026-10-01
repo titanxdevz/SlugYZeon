@@ -54,25 +54,36 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
 
     private final SpotifyTokenTracker tokenTracker;
     private final String countryCode;
-    private final int playlistPageLimit;
-    private final int albumPageLimit;
-    private final boolean resolveArtistsInSearch;
-    private final boolean localFiles;
+    private int playlistPageLimit = 6;
+    private int albumPageLimit = 6;
+    private boolean resolveArtistsInSearch = false;
+    private boolean localFiles = false;
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
-    public SpotifyAudioSourceManager(String[] providers, String countryCode, int playlistPageLimit,
-            int albumPageLimit, boolean resolveArtistsInSearch, boolean localFiles, String spDc,
+    public SpotifyAudioSourceManager(String[] providers, String countryCode, String spDc,
             Function<Void, AudioPlayerManager> manager) {
         super(manager, new DefaultMirroringAudioTrackResolver(providers));
         this.tokenTracker = new SpotifyTokenTracker(spDc);
         this.countryCode = (countryCode == null || countryCode.isEmpty()) ? "US" : countryCode;
-        this.playlistPageLimit = playlistPageLimit > 0 ? playlistPageLimit : 6;
-        this.albumPageLimit = albumPageLimit > 0 ? albumPageLimit : 6;
+    }
+
+    public void setPlaylistPageLimit(int playlistPageLimit) {
+        this.playlistPageLimit = playlistPageLimit;
+    }
+
+    public void setAlbumPageLimit(int albumPageLimit) {
+        this.albumPageLimit = albumPageLimit;
+    }
+
+    public void setResolveArtistsInSearch(boolean resolveArtistsInSearch) {
         this.resolveArtistsInSearch = resolveArtistsInSearch;
+    }
+
+    public void setLocalFiles(boolean localFiles) {
         this.localFiles = localFiles;
     }
 
