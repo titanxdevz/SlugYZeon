@@ -31,10 +31,6 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
     private PandoraAudioSourceManager pandora;
     private YouTubeSourceManager youtube;
 
-    public SpotifyAudioSourceManager getSpotify() {
-        return spotify;
-    }
-
     public SlugYZeonPlugin(
         SlugYZeonConfig pluginConfig,
         SlugYZeonSourcesConfig sourcesConfig,

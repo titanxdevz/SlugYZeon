@@ -3,12 +3,17 @@ package com.slugyzeon.plugin.spotify;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.topi314.lavalyrics.AudioLyricsManager;
+import com.github.topi314.lavalyrics.lyrics.AudioLyrics;
+import com.github.topi314.lavalyrics.lyrics.BasicAudioLyrics;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.*;
 import com.slugyzeon.plugin.ExtendedAudioPlaylist;
 import com.slugyzeon.plugin.mirror.DefaultMirroringAudioTrackResolver;
 import com.slugyzeon.plugin.mirror.MirroringAudioSourceManager;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +30,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
+public class SpotifyAudioSourceManager extends MirroringAudioSourceManager implements AudioLyricsManager {
 
     private static final Logger log = LoggerFactory.getLogger(SpotifyAudioSourceManager.class);
 
@@ -191,68 +196,82 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager {
         return tokenTracker.getAnonymousAccessToken();
     }
 
-    public JsonNode fetchColorLyrics(String trackId, String artworkUrl) throws IOException {
-        try {
-            String token = getAccessToken();
-            String url = "https://spclient.wg.spotify.com/color-lyrics/v2/track/" + trackId;
+    public AudioLyrics getLyrics(String id) throws IOException, InterruptedException {
+        String token = getAccessToken();
+        String url = "https://spclient.wg.spotify.com/color-lyrics/v2/track/" + id + "?format=json&vocalRemoval=false";
 
-            if (artworkUrl != null && !artworkUrl.isBlank()) {
-                url += "/image/" + java.net.URLEncoder.encode(artworkUrl, java.nio.charset.StandardCharsets.UTF_8);
-            }
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Bearer " + token)
+                .header("User-Agent", USER_AGENT)
+                .header("App-Platform", "WebPlayer")
+                .header("Accept", "application/json")
+                .header("Accept-Language", "en")
+                .GET().build();
 
-            url += "?format=json&vocalRemoval=false&market=from_token";
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(10))
-                    .header("Authorization", "Bearer " + token)
-                    .header("User-Agent", "Spotify/9.0.0.2 iOS/18.4 (iPhone15,3)")
-                    .header("App-Platform", "iOS")
-                    .header("Accept", "application/json")
-                    .header("Accept-Language", "en")
-                    .GET().build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 401) {
-                log.debug("Lyrics 401, refreshing token and retrying");
-                token = getAccessToken();
-                request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .timeout(Duration.ofSeconds(10))
-                        .header("Authorization", "Bearer " + token)
-                        .header("User-Agent", "Spotify/9.0.0.2 iOS/18.4 (iPhone15,3)")
-                        .header("App-Platform", "iOS")
-                        .header("Accept", "application/json")
-                        .header("Accept-Language", "en")
-                        .GET().build();
-                response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            }
-
-            if (response.statusCode() == 404) {
-                return null;
-            }
-            if (response.statusCode() != 200) {
-                log.warn("Color lyrics returned {} for track {}", response.statusCode(), trackId);
-                return null;
-            }
-
-            return mapper.readTree(response.body());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted fetching lyrics", e);
+        if (response.statusCode() != 200) {
+            return null;
         }
+
+        JsonNode json = mapper.readTree(response.body());
+        if (json == null || !json.has("lyrics")) {
+            return null;
+        }
+
+        var lyrics = new ArrayList<AudioLyrics.Line>();
+        for (JsonNode line : json.path("lyrics").path("lines")) {
+            lyrics.add(new BasicAudioLyrics.BasicLine(
+                    Duration.ofMillis(line.path("startTimeMs").asLong(0)),
+                    null,
+                    line.path("words").asText("")
+            ));
+        }
+
+        return new BasicAudioLyrics("spotify", json.path("lyrics").path("providerDisplayName").asText("MusixMatch"), null, lyrics);
     }
 
-    public String resolveTrackIdFromIsrc(String isrc) throws IOException {
-        AudioItem result = getSearch("isrc:" + isrc, false);
-        if (result instanceof AudioPlaylist) {
-            AudioPlaylist playlist = (AudioPlaylist) result;
-            if (!playlist.getTracks().isEmpty()) {
-                return playlist.getTracks().get(0).getIdentifier();
+    @Override
+    @Nullable
+    public AudioLyrics loadLyrics(@NotNull AudioTrack audioTrack) {
+        var spotifyTackId = "";
+        if (audioTrack instanceof SpotifyAudioTrack) {
+            spotifyTackId = audioTrack.getIdentifier();
+        }
+
+        if (spotifyTackId.isEmpty()) {
+            AudioItem item = AudioReference.NO_TRACK;
+            try {
+                if (audioTrack.getInfo().isrc != null && !audioTrack.getInfo().isrc.isEmpty()) {
+                    item = this.getSearch("isrc:" + audioTrack.getInfo().isrc, false);
+                }
+                if (item == AudioReference.NO_TRACK) {
+                    item = this.getSearch(String.format("%s %s", audioTrack.getInfo().title, audioTrack.getInfo().author), false);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            if (item == AudioReference.NO_TRACK) {
+                return null;
+            }
+            if (item instanceof AudioTrack) {
+                spotifyTackId = ((AudioTrack) item).getIdentifier();
+            } else if (item instanceof AudioPlaylist) {
+                var playlist = (AudioPlaylist) item;
+                if (!playlist.getTracks().isEmpty()) {
+                    spotifyTackId = playlist.getTracks().get(0).getIdentifier();
+                }
             }
         }
-        return null;
+
+        try {
+            return this.getLyrics(spotifyTackId);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String getToken() throws IOException {

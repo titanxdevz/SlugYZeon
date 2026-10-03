@@ -34,6 +34,7 @@
 - **Spotify GraphQL API** — Zero-downtime hash rotation, asynchronous infinite pagination, bypasses rate limits.
 - **Gaana Native Streaming** — Fully persistent HLS chunk buffering directly from Akamai CDN.
 - **Rich Metadata** — Returns extended playlists, ISRC codes, album/artist URLs, and preview URLs.
+- **Native Lyrics** — Built-in integration with LavaLyrics for Spotify color lyrics.
 - **Zero HTTP Dependencies** — Relies entirely on Java's native `HttpClient` for maximal performance.
 - **Seamless Integration** — Plugs directly into standard Lavalink 4.0+ via spring boot.
 
@@ -152,11 +153,6 @@ GET /v4/loadtracks?identifier=https://open.spotify.com/track/7qiZfU4dY1lWllzX7mP
 GET /v4/loadtracks?identifier=https://open.spotify.com/album/1ATL5GLyefJaxhQzSPVrLX
 GET /v4/loadtracks?identifier=https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
 GET /v4/loadtracks?identifier=https://open.spotify.com/artist/1Xyo4u8uXC1ZmMpatF05PJ
-
-# color lyrics (REST API)
-GET /v4/spotify/color-lyrics?trackId=7qiZfU4dY1lWllzX7mPBI3
-GET /v4/spotify/color-lyrics?isrc=USUM72400086
-GET /v4/spotify/color-lyrics?trackId=7qiZfU4dY1lWllzX7mPBI3&artworkUrl=https://i.scdn.co/image/...
 ```
 
 ### Gaana
