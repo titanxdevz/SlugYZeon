@@ -58,13 +58,14 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.178 Spotify/1.2.65.255 Safari/537.36";
 
     private final SpotifyTokenTracker tokenTracker;
-    private final String countryCode;
+    private volatile String countryCode;
     private int playlistPageLimit = 6;
     private int albumPageLimit = 6;
     private boolean resolveArtistsInSearch = false;
     private boolean localFiles = false;
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_2)
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
@@ -80,20 +81,46 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
         this.playlistPageLimit = playlistPageLimit;
     }
 
+    public int getPlaylistPageLimit() {
+        return this.playlistPageLimit;
+    }
+
     public void setAlbumPageLimit(int albumPageLimit) {
         this.albumPageLimit = albumPageLimit;
+    }
+
+    public int getAlbumPageLimit() {
+        return this.albumPageLimit;
     }
 
     public void setResolveArtistsInSearch(boolean resolveArtistsInSearch) {
         this.resolveArtistsInSearch = resolveArtistsInSearch;
     }
 
+    public boolean isResolveArtistsInSearch() {
+        return this.resolveArtistsInSearch;
+    }
+
     public void setLocalFiles(boolean localFiles) {
         this.localFiles = localFiles;
     }
 
+    public boolean isLocalFiles() {
+        return this.localFiles;
+    }
+
     public void setSpDc(String spDc) {
         this.tokenTracker.setSpDc(spDc);
+    }
+
+    public String getCountryCode() {
+        return this.countryCode;
+    }
+
+    public void setCountryCode(String countryCode) {
+        if (countryCode != null && !countryCode.isEmpty()) {
+            this.countryCode = countryCode;
+        }
     }
 
 
@@ -194,6 +221,41 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
 
     public String getAccessToken() throws IOException {
         return tokenTracker.getAnonymousAccessToken();
+    }
+
+    public String getCanvas(String id) {
+        if (id == null || id.isEmpty()) {
+            return null;
+        }
+        try {
+            String token = getAccessToken();
+            String url = "https://spclient.wg.spotify.com/canvaz-cache/v0/canvases";
+            String body = "{\"tracks\":[{\"track_uri\":\"spotify:track:" + id + "\"}]}";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(6))
+                    .header("Authorization", "Bearer " + token)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200 && response.body() != null) {
+                JsonNode json = mapper.readTree(response.body());
+                JsonNode canvases = json.path("canvases");
+                if (canvases.isArray() && canvases.size() > 0) {
+                    String canvasUrl = canvases.get(0).path("canvas_url").asText(null);
+                    if (canvasUrl != null && !canvasUrl.isEmpty()) {
+                        return canvasUrl;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     public AudioLyrics getLyrics(String id) throws IOException, InterruptedException {
@@ -433,7 +495,8 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
             return AudioReference.NO_TRACK;
 
         java.util.Map<String, String> isrcMap = fetchIsrcMap(List.of(id));
-        return parseGqlTrackWithIsrc(track, id, preview, isrcMap.get(id));
+        String canvasUrl = getCanvas(id);
+        return parseGqlTrackWithIsrc(track, id, preview, isrcMap.get(id), canvasUrl);
     }
 
     public AudioItem getSearch(String query, boolean preview) throws IOException {
@@ -477,34 +540,65 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
     public AudioItem getRecommendations(String query, boolean preview) throws IOException {
         String seedTrackId = null;
 
-        Matcher mixMatcher = RADIO_MIX_QUERY_PATTERN.matcher(query);
-        if (mixMatcher.find()) {
-            String seedType = mixMatcher.group("seedType");
-            String seed = mixMatcher.group("seed");
-
-            if ("isrc".equals(seedType)) {
-                AudioItem item = getSearch("isrc:" + seed, preview);
-                if (item == AudioReference.NO_TRACK)
-                    return AudioReference.NO_TRACK;
-                if (item instanceof AudioPlaylist) {
-                    AudioPlaylist playlist = (AudioPlaylist) item;
-                    if (!playlist.getTracks().isEmpty()) {
-                        seed = playlist.getTracks().get(0).getIdentifier();
-                        seedType = "track";
-                    } else {
-                        return AudioReference.NO_TRACK;
+        if (query.contains("seed_tracks=") || query.contains("seed_artists=") || query.contains("seed_genres=")) {
+            String[] parts = query.split("&");
+            for (String part : parts) {
+                if (part.startsWith("seed_tracks=")) {
+                    String tracks = part.substring("seed_tracks=".length());
+                    String[] ids = tracks.split(",");
+                    if (ids.length > 0 && !ids[0].trim().isEmpty()) {
+                        seedTrackId = ids[0].trim();
+                        break;
+                    }
+                } else if (part.startsWith("seed_artists=")) {
+                    String artists = part.substring("seed_artists=".length());
+                    String[] ids = artists.split(",");
+                    if (ids.length > 0 && !ids[0].trim().isEmpty()) {
+                        AudioItem artistItem = getArtist(ids[0].trim(), preview);
+                        if (artistItem instanceof AudioPlaylist && !((AudioPlaylist) artistItem).getTracks().isEmpty()) {
+                            seedTrackId = ((AudioPlaylist) artistItem).getTracks().get(0).getIdentifier();
+                            break;
+                        }
                     }
                 }
             }
-
-            if ("track".equals(seedType)) {
-                seedTrackId = seed;
-            }
-        } else {
-            seedTrackId = query;
         }
 
-        if (seedTrackId != null) {
+        if (seedTrackId == null) {
+            Matcher mixMatcher = RADIO_MIX_QUERY_PATTERN.matcher(query);
+            if (mixMatcher.find()) {
+                String seedType = mixMatcher.group("seedType");
+                String seed = mixMatcher.group("seed");
+
+                if ("isrc".equals(seedType)) {
+                    AudioItem item = getSearch("isrc:" + seed, preview);
+                    if (item == AudioReference.NO_TRACK)
+                        return AudioReference.NO_TRACK;
+                    if (item instanceof AudioPlaylist) {
+                        AudioPlaylist playlist = (AudioPlaylist) item;
+                        if (!playlist.getTracks().isEmpty()) {
+                            seed = playlist.getTracks().get(0).getIdentifier();
+                            seedType = "track";
+                        } else {
+                            return AudioReference.NO_TRACK;
+                        }
+                    }
+                }
+
+                if ("artist".equals(seedType)) {
+                    AudioItem artistItem = getArtist(seed, preview);
+                    if (artistItem instanceof AudioPlaylist && !((AudioPlaylist) artistItem).getTracks().isEmpty()) {
+                        seedTrackId = ((AudioPlaylist) artistItem).getTracks().get(0).getIdentifier();
+                    }
+                } else if ("track".equals(seedType)) {
+                    seedTrackId = seed;
+                }
+            } else {
+                seedTrackId = query.trim();
+            }
+        }
+
+        if (seedTrackId != null && !seedTrackId.isEmpty()) {
             AudioItem gqlResult = getGqlRecommendations(seedTrackId, preview);
             if (gqlResult != null)
                 return gqlResult;
@@ -824,6 +918,10 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
     }
 
     private AudioTrack parseGqlTrackWithIsrc(JsonNode trackData, String trackId, boolean preview, String restIsrc) {
+        return parseGqlTrackWithIsrc(trackData, trackId, preview, restIsrc, null);
+    }
+
+    private AudioTrack parseGqlTrackWithIsrc(JsonNode trackData, String trackId, boolean preview, String restIsrc, String canvasUrl) {
         if (trackData == null || trackData.isNull() || trackData.isMissingNode())
             return null;
 
@@ -869,7 +967,7 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
                 artworkUrl,
                 isrc);
         return new SpotifyAudioTrack(info, albumName, albumUrl, artistUrl, artistArtwork,
-                null, preview, this);
+                null, preview, canvasUrl, this);
     }
 
     private static String base62ToHex(String id) {
