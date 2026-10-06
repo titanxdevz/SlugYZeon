@@ -4,6 +4,7 @@ import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.slugyzeon.plugin.amazonmusic.AmazonMusicAudioSourceManager;
 import com.slugyzeon.plugin.config.*;
 import com.slugyzeon.plugin.gaana.GaanaAudioSourceManager;
+import com.slugyzeon.plugin.lastfm.LastFmSourceManager;
 import com.slugyzeon.plugin.pandora.PandoraAudioSourceManager;
 import com.slugyzeon.plugin.spotify.SpotifyAudioSourceManager;
 import com.slugyzeon.plugin.youtube.YouTubeSourceManager;
@@ -34,6 +35,7 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
     private SpotifyAudioSourceManager spotify;
     private PandoraAudioSourceManager pandora;
     private YouTubeSourceManager youtube;
+    private LastFmSourceManager lastFm;
 
     public SlugYZeonPlugin(
         SlugYZeonConfig pluginConfig,
@@ -42,7 +44,8 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         PandoraConfig pandoraConfig,
         SlugYZeonYouTubeConfig youtubeConfig,
         AmazonMusicConfig amazonMusicConfig,
-        SlugYZeonSpotifyConfig spotifyConfig
+        SlugYZeonSpotifyConfig spotifyConfig,
+        LastFmConfig lastFmConfig
     ) {
         log.info("Loading SlugYZeoN plugin...");
         this.sourcesConfig = sourcesConfig;
@@ -108,6 +111,10 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
                 throw new IllegalStateException("SlugYZeon Youtube Source requires the new Youtube Source plugin to be enabled.");
             }
         }
+
+        if (lastFmConfig.getApiKey() != null && !lastFmConfig.getApiKey().isEmpty()) {
+            this.lastFm = new LastFmSourceManager(lastFmConfig.getApiKey());
+        }
     }
 
     private boolean hasNewYoutubeSource() {
@@ -117,6 +124,22 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         } catch (ClassNotFoundException ignored) {
             return false;
         }
+    }
+
+    public SpotifyAudioSourceManager getSpotifySource() {
+        return this.spotify;
+    }
+
+    public YouTubeSourceManager getYouTubeSource() {
+        return this.youtube;
+    }
+
+    public LastFmSourceManager getLastFmSource() {
+        return this.lastFm;
+    }
+
+    public AudioPlayerManager getPlayerManager() {
+        return this.manager;
     }
 
     @NotNull
@@ -139,6 +162,9 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         if (this.pandora != null) {
             log.info("Registering Pandora audio source manager...");
             manager.registerSourceManager(this.pandora);
+        }
+        if (this.lastFm != null) {
+            log.info("Registering Last.fm recommendations manager...");
         }
 
         return manager;
