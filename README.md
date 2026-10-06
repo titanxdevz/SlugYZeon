@@ -170,6 +170,7 @@ GET /v4/sessions/{sessionId}/players/{guildId}/recommendation?limit=10
 ## Credits
 
 - **[lavalink-devs](https://github.com/lavalink-devs/lavalink-plugin-template)** — Official Lavalink plugin template.
+- **[SlugYZeon](https://github.com/xylen-py/SlugYZeon)** — Original source implementation and concepts.
 
 ---
 
