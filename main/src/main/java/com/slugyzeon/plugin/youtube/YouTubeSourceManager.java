@@ -8,6 +8,7 @@ import com.sedmelluq.discord.lavaplayer.track.*;
 
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -17,6 +18,10 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import org.slf4j.Logger;
@@ -31,21 +36,80 @@ public class YouTubeSourceManager implements AudioSourceManager {
     );
     private final Function<Void, AudioPlayerManager> audioPlayerManager;
     private AudioSourceManager originalYouTubeSource;
-    private final boolean oembed;
-    private final boolean mirror;
+    private volatile boolean oembed;
+    private volatile boolean mirror;
+    private volatile String[] mirrorProviders;
+    private volatile boolean localDiskCache;
+    private volatile String diskCachePath;
+    private volatile String cipherUrl;
+    private final YouTubeProxyHandler proxyHandler;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private final ObjectMapper mapper = new ObjectMapper();
+    private final ScheduledExecutorService cleanupExecutor = Executors.newSingleThreadScheduledExecutor();
+    private final ExecutorService cacheExecutor = Executors.newFixedThreadPool(3);
 
     public YouTubeSourceManager(
             boolean oembed,
             boolean mirror,
             Function<Void, AudioPlayerManager> audioPlayerManager) {
+        this(oembed, mirror, null, false, "youtube-cache", "https://cipher.kikkia.dev", audioPlayerManager);
+    }
+
+    public YouTubeSourceManager(
+            boolean oembed,
+            boolean mirror,
+            List<String> mirrorProviders,
+            boolean localDiskCache,
+            String diskCachePath,
+            String cipherUrl,
+            Function<Void, AudioPlayerManager> audioPlayerManager) {
         this.oembed = oembed;
         this.mirror = mirror;
         this.audioPlayerManager = audioPlayerManager;
+        this.localDiskCache = localDiskCache;
+        this.diskCachePath = diskCachePath != null && !diskCachePath.isEmpty() ? diskCachePath : "youtube-cache";
+        this.cipherUrl = cipherUrl != null && !cipherUrl.isEmpty() ? cipherUrl : "https://cipher.kikkia.dev";
+        this.proxyHandler = new YouTubeProxyHandler(this.cipherUrl);
+
+        if (mirrorProviders != null && !mirrorProviders.isEmpty()) {
+            this.mirrorProviders = mirrorProviders.toArray(new String[0]);
+        } else {
+            this.mirrorProviders = new String[] { "scsearch:%QUERY%" };
+        }
+
+        if (this.localDiskCache) {
+            File cacheDir = new File(this.diskCachePath);
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs();
+            }
+            startCacheCleanupTask(cacheDir);
+        }
+    }
+
+    private void startCacheCleanupTask(File cacheDir) {
+        cleanupExecutor.scheduleAtFixedRate(() -> {
+            try {
+                long expirationTime = System.currentTimeMillis() - Duration.ofDays(7).toMillis();
+                File[] files = cacheDir.listFiles();
+                int deletedCount = 0;
+                if (files != null) {
+                    for (File file : files) {
+                        if (file.isFile() && file.lastModified() < expirationTime) {
+                            if (file.delete()) {
+                                deletedCount++;
+                            }
+                        }
+                    }
+                }
+                if (deletedCount > 0) {
+                    log.info("Cleared {} tracks from local cache, inactive from last 7 days.", deletedCount);
+                }
+            } catch (Exception ignored) {
+            }
+        }, 1, 24, TimeUnit.HOURS);
     }
 
     private static class OembedData {
@@ -62,6 +126,79 @@ public class YouTubeSourceManager implements AudioSourceManager {
 
     public boolean isMirror() {
         return mirror;
+    }
+
+    public void setMirror(boolean mirror) {
+        this.mirror = mirror;
+    }
+
+    public boolean isOembed() {
+        return oembed;
+    }
+
+    public void setOembed(boolean oembed) {
+        this.oembed = oembed;
+    }
+
+    public boolean isLocalDiskCache() {
+        return localDiskCache;
+    }
+
+    public void setLocalDiskCache(boolean localDiskCache) {
+        this.localDiskCache = localDiskCache;
+        if (localDiskCache) {
+            File cacheDir = new File(this.diskCachePath);
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs();
+            }
+        }
+    }
+
+    public String getDiskCachePath() {
+        return diskCachePath;
+    }
+
+    public void setDiskCachePath(String diskCachePath) {
+        if (diskCachePath != null && !diskCachePath.isEmpty()) {
+            this.diskCachePath = diskCachePath;
+            if (this.localDiskCache) {
+                File cacheDir = new File(this.diskCachePath);
+                if (!cacheDir.exists()) {
+                    cacheDir.mkdirs();
+                }
+            }
+        }
+    }
+
+    public String getCipherUrl() {
+        return cipherUrl;
+    }
+
+    public void setCipherUrl(String cipherUrl) {
+        if (cipherUrl != null && !cipherUrl.isEmpty()) {
+            this.cipherUrl = cipherUrl;
+            if (this.proxyHandler != null) {
+                this.proxyHandler.setCipherUrl(cipherUrl);
+            }
+        }
+    }
+
+    public String[] getMirrorProviders() {
+        return mirrorProviders;
+    }
+
+    public void setMirrorProviders(List<String> providers) {
+        if (providers != null && !providers.isEmpty()) {
+            this.mirrorProviders = providers.toArray(new String[0]);
+        }
+    }
+
+    public YouTubeProxyHandler getProxyHandler() {
+        return proxyHandler;
+    }
+
+    public ExecutorService getCacheExecutor() {
+        return cacheExecutor;
     }
 
     public AudioSourceManager getOriginalYouTubeSource() {
@@ -132,8 +269,12 @@ public class YouTubeSourceManager implements AudioSourceManager {
             && (url.contains("youtube.com") || url.contains("youtu.be"));
     }
 
-    private String extractVideoId(String url) {
-        if (url == null) return null;
+    public String extractVideoId(String url) {
+        if (url == null || url.isEmpty()) return null;
+        url = url.trim();
+        if (url.length() == 11 && !url.contains("/") && !url.contains(".") && !url.contains(":")) {
+            return url;
+        }
         java.util.regex.Matcher matcher = VIDEO_ID_PATTERN.matcher(url);
         if (matcher.find()) {
             return matcher.group(1);
@@ -144,10 +285,11 @@ public class YouTubeSourceManager implements AudioSourceManager {
     private OembedData fetchOembedData(String url) throws Exception {
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(oembedUrl + url))
+                .timeout(Duration.ofSeconds(10))
                 .GET()
                 .build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        if (res.statusCode() == 200) {
+        if (res.statusCode() == 200 && res.body() != null) {
             JsonNode json = mapper.readTree(res.body());
             OembedData data = new OembedData();
             data.title = json.has("title") ? json.get("title").asText() : null;
@@ -162,27 +304,30 @@ public class YouTubeSourceManager implements AudioSourceManager {
 
     @Override
     public AudioItem loadItem(AudioPlayerManager manager, AudioReference reference) {
-        if (originalYouTubeSource == null)
+        if (reference == null || reference.identifier == null) {
             return null;
+        }
 
         AudioItem result = null;
         Exception loadException = null;
 
-        try {
-            result = originalYouTubeSource.loadItem(manager, reference);
-        } catch (Exception e) {
-            loadException = e;
+        if (originalYouTubeSource != null) {
+            try {
+                result = originalYouTubeSource.loadItem(manager, reference);
+            } catch (Exception e) {
+                loadException = e;
+            }
         }
 
         if ((result == null || loadException != null) && oembed && isYouTubeUrl(reference.identifier)) {
             try {
                 OembedData data = fetchOembedData(reference.identifier);
-                if (data != null && data.title != null) {
+                if (data != null && data.title != null && originalYouTubeSource != null) {
                     String[] prefixes = {"ytsearch:", "ytmsearch:"};
                     String query = data.title + (data.authorName != null ? " " + data.authorName : "");
                     for (String prefix : prefixes) {
                         AudioItem searchResult = originalYouTubeSource.loadItem(manager, new AudioReference(prefix + query, null));
-                        
+
                         if (searchResult instanceof AudioPlaylist) {
                             String videoId = extractVideoId(reference.identifier);
                             for (AudioTrack track : ((AudioPlaylist) searchResult).getTracks()) {
@@ -205,6 +350,10 @@ public class YouTubeSourceManager implements AudioSourceManager {
                 }
             } catch (Exception ignored) {
             }
+        }
+
+        if (result == null && proxyHandler != null) {
+            result = fallbackLoadItem(reference);
         }
 
         if (result != null) {
@@ -232,7 +381,40 @@ public class YouTubeSourceManager implements AudioSourceManager {
         return null;
     }
 
+    private AudioItem fallbackLoadItem(AudioReference reference) {
+        String id = reference.identifier;
+        if (id == null) {
+            return null;
+        }
 
+        if (id.startsWith("ytsearch:") || id.startsWith("ytmsearch:")) {
+            String query = id.substring(id.indexOf(':') + 1);
+            List<YouTubeProxyHandler.VideoInfo> results = proxyHandler.search(query, id.startsWith("ytm"));
+            if (results != null && !results.isEmpty()) {
+                List<AudioTrack> tracks = new ArrayList<>();
+                for (YouTubeProxyHandler.VideoInfo info : results) {
+                    tracks.add(buildProxyTrack(info));
+                }
+                return new BasicAudioPlaylist("Search results for: " + query, tracks, null, true);
+            }
+        } else {
+            String videoId = extractVideoId(id);
+            if (videoId != null) {
+                YouTubeProxyHandler.VideoInfo info = proxyHandler.getVideoInfo(videoId);
+                if (info != null) {
+                    return buildProxyTrack(info);
+                }
+            }
+        }
+        return null;
+    }
+
+    private AudioTrack buildProxyTrack(YouTubeProxyHandler.VideoInfo info) {
+        AudioTrackInfo trackInfo = new AudioTrackInfo(
+                info.title, info.author, info.durationMs, info.videoId,
+                info.isStream, info.uri, info.thumbnail, info.isrc);
+        return new YouTubeTrack(trackInfo, info.videoId, null, this);
+    }
 
     private AudioTrack wrapTrack(AudioTrack original) {
         return new YouTubeTrack(original.getInfo(), original.getInfo().identifier, original, this);
@@ -278,12 +460,17 @@ public class YouTubeSourceManager implements AudioSourceManager {
             }
         } catch (Exception ignored) {
         }
-        
+
         return new YouTubeTrack(trackInfo, trackInfo.identifier, original, this);
     }
 
     @Override
     public void shutdown() {
+        cleanupExecutor.shutdownNow();
+        cacheExecutor.shutdownNow();
+        if (proxyHandler != null) {
+            proxyHandler.shutdown();
+        }
         if (originalYouTubeSource != null)
             originalYouTubeSource.shutdown();
     }
