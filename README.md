@@ -27,10 +27,20 @@
 | Spotify        | tracks, albums, playlists, artists               | [Mirror](#what-is-mirroring) |
 | Gaana          | songs, albums, playlists, artists                | Native Stream (HLS)          |
 | Pandora        | tracks, albums, playlists, artists, stations     | [Mirror](#what-is-mirroring) |
+| YouTube        | tracks, searches, oEmbed, streams                | Direct / [Mirror](#what-is-mirroring) |
 
 ### Features
 
 - **Mirror System** — ISRC-first resolution with automatic query fallback for mirrored sources.
+- **YouTube Client Rotation** — Rotates between WEB, ANDROID, IOS, TVHTML5, and WEB_EMBEDDED clients with cooldown tracking.
+- **PoToken Session Warmer & Pool** — Autonomous visitor session pool with background renewal every 30 minutes.
+- **Adaptive Range Streaming** — Throttling mitigation using HTTP Range requests and multi-format audio fallback candidate stepping.
+- **ATV Counterpart Track Swapping** — Detects music videos and swaps in clean YouTube Music audio tracks (`MUSIC_VIDEO_TYPE_ATV`) to bypass video skits and intro chatter.
+- **Dual-Format Disk Cache & Sidecars** — Verifies cached WebM/M4A audio headers and maintains structured `<videoId>.json` metadata sidecars.
+- **Search Autocomplete Endpoint** — Provides real-time search query suggestions via `/v4/slugyzeon/youtube/suggest`.
+- **Bot & PoToken Protection** — Soft-fails blocked clients on 429s, 403s, and login/bot challenges, rotating to next available client.
+- **Region & Availability Bypass** — Retries unavailable or geo-blocked tracks with alternate region parameters before failing.
+- **Automatic Mirror Fallback** — Automatically routes failed YouTube tracks to mirror providers without surfacing errors.
 - **Spotify GraphQL API** — Zero-downtime hash rotation, asynchronous infinite pagination, bypasses rate limits.
 - **Gaana Native Streaming** — Fully persistent HLS chunk buffering directly from Akamai CDN.
 - **Rich Metadata** — Returns extended playlists, ISRC codes, album/artist URLs, and preview URLs.
@@ -81,7 +91,14 @@ plugins:
       youtube: false # Enable YouTube-SlugYZeon source (requires the new Youtube Source plugin)
     youtube:
       oembed: false # Use youtube.com/oembed?url= to resolve tracks
-      mirror: false # Use other sources to mirror tracks if the YouTube plugin fails
+      mirror: false # Use active Lavalink sources to mirror tracks if direct YouTube playback fails
+      mirrorProviders: # Custom fallback providers when direct YouTube playback fails
+        # - "spsearch:%QUERY%"
+        # - "dzsearch:%QUERY%"
+        - "scsearch:%QUERY%"
+      localDiskCache: false # Enable local disk caching for streamed audio
+      diskCachePath: "youtube-cache" # Directory path for local audio cache
+      cipherUrl: "https://cipher.kikkia.dev" # External cipher decryption service endpoint
     spotify:
       spDc: "your spDc cookie" # Required to fetch lyrics (works with free or premium accounts)
       countryCode: "US" # the country code for filtering artist top tracks
@@ -131,6 +148,14 @@ You can dynamically update your configuration at runtime without restarting Lava
   },
   "pandora": {
     "searchLimit": 6
+  },
+  "youtube": {
+    "oembed": false,
+    "mirror": true,
+    "mirrorProviders": ["scsearch:%QUERY%"],
+    "localDiskCache": true,
+    "diskCachePath": "youtube-cache",
+    "cipherUrl": "https://cipher.kikkia.dev"
   }
 }
 ```
@@ -198,6 +223,22 @@ GET /v4/loadtracks?identifier=https://www.pandora.com/artist/queen/bohemian-rhap
 GET /v4/loadtracks?identifier=https://www.pandora.com/artist/queen/a-night-at-the-opera/ALxxxxxx
 GET /v4/loadtracks?identifier=https://www.pandora.com/playlist/PLxxxxxx
 GET /v4/loadtracks?identifier=https://www.pandora.com/station/STxxxxxx
+```
+
+### YouTube
+
+```bash
+# search
+GET /v4/loadtracks?identifier=ytsearch:Never Gonna Give You Up
+GET /v4/loadtracks?identifier=ytmsearch:Never Gonna Give You Up
+
+# search suggestions / autocomplete
+GET /v4/slugyzeon/youtube/suggest?query=Never+Gonna
+
+# url support
+GET /v4/loadtracks?identifier=https://www.youtube.com/watch?v=dQw4w9WgXcQ
+GET /v4/loadtracks?identifier=https://youtu.be/dQw4w9WgXcQ
+GET /v4/loadtracks?identifier=https://www.youtube.com/shorts/dQw4w9WgXcQ
 ```
 
 ---
