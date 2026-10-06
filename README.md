@@ -30,6 +30,7 @@
 | Source | Features | Playback |
 |---|---|---|
 | Spotify | tracks, albums, playlists, artists, recommendations | [Mirror](#what-is-mirroring) |
+| JioSaavn | songs, albums, playlists, artists, recommendations | Direct Stream (320kbps / MP4) |
 | Gaana | songs, albums, playlists, artists | Native Stream (HLS) |
 | Amazon Music | tracks, albums, playlists, artists | [Mirror](#what-is-mirroring) |
 | Pandora | tracks, albums, playlists, artists, stations | [Mirror](#what-is-mirroring) |
@@ -95,6 +96,7 @@ plugins:
   solaceaudio:
     sources:
       spotify: true
+      jiosaavn: true
       gaana: true
       amazonmusic: true
       pandora: true
@@ -102,6 +104,9 @@ plugins:
     spotify:
       market: "US"
       fallbackMarkets: ["GB", "DE", "IN"]
+    jiosaavn:
+      apiUrl: "https://saavn.dev" # Optional custom JioSaavn API instance
+      playlistLoadLimit: 50
     cache:
       maxDiskCacheMb: 10240        # Maximum disk storage cap (in MB)
       maxSearchMemoryEntries: 5000  # Number of in-memory search queries to cache
@@ -139,6 +144,14 @@ GET /v4/sessions/{sessionId}/players/{guildId}/recommendation?limit=10
 - `https://open.spotify.com/artist/...`
 - `spsearch:query`
 - `sprec:seed_tracks=...&seed_artists=...`
+
+### JioSaavn
+- `https://www.jiosaavn.com/song/...`
+- `https://www.jiosaavn.com/album/...`
+- `https://www.jiosaavn.com/featured/...`
+- `https://www.jiosaavn.com/artist/...`
+- `jssearch:query`
+- `jsrec:songId`
 
 ### Gaana
 - `https://gaana.com/song/...`

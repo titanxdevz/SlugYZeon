@@ -30,6 +30,7 @@ public class SolaceAudioPlugin implements AudioPlayerManagerConfiguration {
 
     private final SolaceAudioSourcesConfig sourcesConfig;
     private AudioPlayerManager manager;
+    private com.solaceaudio.plugin.jiosaavn.JioSaavnAudioSourceManager jioSaavn;
     private GaanaAudioSourceManager gaana;
     private AmazonMusicAudioSourceManager amazonMusic;
     private SpotifyAudioSourceManager spotify;
@@ -40,6 +41,7 @@ public class SolaceAudioPlugin implements AudioPlayerManagerConfiguration {
     public SolaceAudioPlugin(
         SolaceAudioConfig pluginConfig,
         SolaceAudioSourcesConfig sourcesConfig,
+        com.solaceaudio.plugin.config.JioSaavnConfig jioSaavnConfig,
         GaanaConfig gaanaConfig,
         PandoraConfig pandoraConfig,
         SolaceAudioYouTubeConfig youtubeConfig,
@@ -50,6 +52,12 @@ public class SolaceAudioPlugin implements AudioPlayerManagerConfiguration {
         log.info("Loading SolaceAudio plugin...");
         this.sourcesConfig = sourcesConfig;
 
+        if (sourcesConfig.isJiosaavn()) {
+            this.jioSaavn = new com.solaceaudio.plugin.jiosaavn.JioSaavnAudioSourceManager(jioSaavnConfig.getApiUrl());
+            if (jioSaavnConfig.getPlaylistLoadLimit() > 0) {
+                this.jioSaavn.setPlaylistLoadLimit(jioSaavnConfig.getPlaylistLoadLimit());
+            }
+        }
         if (sourcesConfig.isGaana()) {
             this.gaana = new GaanaAudioSourceManager(gaanaConfig.getApiUrl(), unused -> manager);
             if (gaanaConfig.getPlaylistLoadLimit() > 0) {
@@ -147,6 +155,10 @@ public class SolaceAudioPlugin implements AudioPlayerManagerConfiguration {
     public AudioPlayerManager configure(@NotNull AudioPlayerManager manager) {
         this.manager = manager;
 
+        if (this.jioSaavn != null && this.sourcesConfig.isJiosaavn()) {
+            log.info("Registering JioSaavn audio source manager...");
+            manager.registerSourceManager(this.jioSaavn);
+        }
         if (this.gaana != null) {
             log.info("Registering Gaana audio source manager...");
             manager.registerSourceManager(this.gaana);

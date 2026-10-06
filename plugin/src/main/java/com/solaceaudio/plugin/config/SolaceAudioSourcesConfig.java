@@ -12,6 +12,15 @@ public class SolaceAudioSourcesConfig {
     private boolean pandora = false;
     private boolean spotify = false;
     private boolean youtube = false;
+    private boolean jiosaavn = true;
+
+    public boolean isJiosaavn() {
+        return jiosaavn;
+    }
+
+    public void setJiosaavn(boolean jiosaavn) {
+        this.jiosaavn = jiosaavn;
+    }
 
     public boolean isGaana() {
         return gaana;
