@@ -73,6 +73,14 @@ public class SpotifyTokenTracker {
             fetchTokenWithTOTP();
             return;
         } catch (IOException e) {
+            log.debug("TOTP token fetch failed ({}), falling back to embed session token", e.getMessage());
+            lastException = e;
+        }
+
+        try {
+            fetchTokenFromEmbedWidget();
+            return;
+        } catch (IOException e) {
             lastException = e;
         }
 
@@ -182,6 +190,14 @@ public class SpotifyTokenTracker {
         return System.currentTimeMillis() / 1000;
     }
 
+    private static final String[][] STATIC_FALLBACK_NUANCES = new String[][] {
+            { "GM3TMMJTGYZTQNZVGM4DINJZHA4TGOBYGMZTCMRTGEYDSMJRHE4TEOBUG4YTCMRUGQ4DQOJUGQYTAMRRGA2TCMJSHE3TCMBY", "61" },
+            { "G4YDCMBTG44DCMJZHA3TOOJTGM4TANZZGQ4DIMJTGY4DGOBRG42TONZZHEZTONRUHEZDONBXGM", "60" },
+            { "GEYTIOJZGY4DONBZHE2TGNJZGEYDSNBVGM2TMNZYGI3TMOJTG4YTOOBTHA2DOOJWGU3TCMBUGQ3TIMZRGI2TCMBYGI4DCMRRGE2DEMJXHA4TSOJW", "59" }
+    };
+
+    private static final String EMBED_WIDGET_URL = "https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT";
+
     private String[] getOrFetchNuance() throws IOException {
         if (cachedNuanceSecret != null && cachedNuanceExpires != null && cachedNuanceExpires.isAfter(Instant.now())) {
             return new String[] { cachedNuanceSecret, String.valueOf(cachedNuanceVersion) };
@@ -192,43 +208,93 @@ public class SpotifyTokenTracker {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(6))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200 && response.body() != null) {
+                JsonNode arr = mapper.readTree(response.body());
+                if (arr.isArray() && arr.size() > 0) {
+                    String bestSecret = null;
+                    int bestVersion = -1;
+                    for (JsonNode entry : arr) {
+                        int v = entry.path("v").asInt(0);
+                        if (v > bestVersion) {
+                            bestVersion = v;
+                            bestSecret = entry.path("s").asText(null);
+                        }
+                    }
+
+                    if (bestSecret != null) {
+                        cachedNuanceSecret = bestSecret;
+                        cachedNuanceVersion = bestVersion;
+                        cachedNuanceExpires = Instant.now().plusSeconds(3600);
+                        return new String[] { bestSecret, String.valueOf(bestVersion) };
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Remote nuance fetch failed ({}), falling back to embedded nuance ring", e.getMessage());
+        }
+
+        for (String[] candidate : STATIC_FALLBACK_NUANCES) {
+            cachedNuanceSecret = candidate[0];
+            cachedNuanceVersion = Integer.parseInt(candidate[1]);
+            cachedNuanceExpires = Instant.now().plusSeconds(1800);
+            return candidate;
+        }
+
+        throw new IOException("No valid nuance found");
+    }
+
+    private void fetchTokenFromEmbedWidget() throws IOException {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(EMBED_WIDGET_URL))
+                    .header("User-Agent", USER_AGENT)
                     .timeout(Duration.ofSeconds(10))
                     .GET()
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new IOException("Nuance endpoint returned " + response.statusCode());
-            }
-
-            JsonNode arr = mapper.readTree(response.body());
-            if (!arr.isArray() || arr.size() == 0) {
-                throw new IOException("Invalid nuance format");
-            }
-
-            String bestSecret = null;
-            int bestVersion = -1;
-            for (JsonNode entry : arr) {
-                int v = entry.path("v").asInt(0);
-                if (v > bestVersion) {
-                    bestVersion = v;
-                    bestSecret = entry.path("s").asText(null);
+            if (response.statusCode() == 200 && response.body() != null) {
+                String body = response.body();
+                int idx = body.indexOf("\"accessToken\":\"");
+                if (idx != -1) {
+                    int start = idx + "\"accessToken\":\"".length();
+                    int end = body.indexOf("\"", start);
+                    if (end != -1) {
+                        String token = body.substring(start, end);
+                        if (!token.isEmpty()) {
+                            long expiryMs = 0;
+                            int expIdx = body.indexOf("\"accessTokenExpirationTimestampMs\":");
+                            if (expIdx != -1) {
+                                int expStart = expIdx + "\"accessTokenExpirationTimestampMs\":".length();
+                                int expEnd = body.indexOf(",", expStart);
+                                if (expEnd != -1) {
+                                    try {
+                                        expiryMs = Long.parseLong(body.substring(expStart, expEnd).trim());
+                                    } catch (Exception ignored) {
+                                    }
+                                }
+                            }
+                            this.anonymousAccessToken = token;
+                            if (expiryMs > 0) {
+                                this.anonymousExpires = Instant.ofEpochMilli(expiryMs).minusSeconds(30);
+                            } else {
+                                this.anonymousExpires = Instant.now().plusSeconds(1800);
+                            }
+                            log.debug("Successfully acquired Spotify token from embed widget");
+                            return;
+                        }
+                    }
                 }
             }
-
-            if (bestSecret == null) {
-                throw new IOException("No valid nuance found");
-            }
-
-            cachedNuanceSecret = bestSecret;
-            cachedNuanceVersion = bestVersion;
-            cachedNuanceExpires = Instant.now().plusSeconds(3600);
-
-            return new String[] { bestSecret, String.valueOf(bestVersion) };
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted", e);
+        } catch (Exception e) {
+            log.debug("Embed widget token acquisition failed: {}", e.getMessage());
         }
+        throw new IOException("Failed to extract access token from embed widget");
     }
 
     private static String generateTOTP(String base32Secret, long timestampMs) {
