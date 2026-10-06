@@ -47,10 +47,10 @@ public class RecommendationController {
 
     @GetMapping("/v4/sessions/{sessionId}/players/{guildId}/recommendation")
     public ResponseEntity<Object> getRecommendations(
-            @PathVariable String sessionId,
-            @PathVariable String guildId,
-            @RequestParam(required = false) String track,
-            @RequestParam(required = false, defaultValue = "10") int limit
+            @PathVariable("sessionId") String sessionId,
+            @PathVariable("guildId") String guildId,
+            @RequestParam(name = "track", required = false) String track,
+            @RequestParam(name = "limit", required = false, defaultValue = "10") int limit
     ) {
         ISocketContext context = socketServer.getSessions().get(sessionId);
         if (context == null) {
