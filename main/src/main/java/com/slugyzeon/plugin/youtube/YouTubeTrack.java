@@ -370,6 +370,7 @@ public class YouTubeTrack extends DelegatedAudioTrack {
                         if (renamed) {
                             log.debug("Successfully cached track {} to {}", videoId, targetFile.getName());
                             writeSidecarMetadata(cacheDir, isWebm ? "webm" : "m4a");
+                            sourceManager.enforceLruDiskCacheQuota(cacheDir);
                         } else {
                             partFile.delete();
                         }

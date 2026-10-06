@@ -101,6 +101,7 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
                     youtubeConfig.isLocalDiskCache(),
                     youtubeConfig.getDiskCachePath(),
                     youtubeConfig.getCipherUrl(),
+                    youtubeConfig.getMaxDiskCacheMb(),
                     unused -> manager
                 );
             } else {
@@ -227,6 +228,9 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
             }
             if (ytConfig.getCipherUrl() != null && !ytConfig.getCipherUrl().isEmpty()) {
                 this.youtube.setCipherUrl(ytConfig.getCipherUrl());
+            }
+            if (ytConfig.getMaxDiskCacheMb() != null) {
+                this.youtube.setMaxDiskCacheMb(ytConfig.getMaxDiskCacheMb());
             }
         }
     }

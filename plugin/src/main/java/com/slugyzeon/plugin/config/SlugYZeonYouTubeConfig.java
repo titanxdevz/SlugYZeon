@@ -56,6 +56,16 @@ public class SlugYZeonYouTubeConfig {
         this.diskCachePath = diskCachePath;
     }
 
+    private long maxDiskCacheMb = 0;
+
+    public long getMaxDiskCacheMb() {
+        return maxDiskCacheMb;
+    }
+
+    public void setMaxDiskCacheMb(long maxDiskCacheMb) {
+        this.maxDiskCacheMb = maxDiskCacheMb;
+    }
+
     public String getCipherUrl() {
         return cipherUrl;
     }

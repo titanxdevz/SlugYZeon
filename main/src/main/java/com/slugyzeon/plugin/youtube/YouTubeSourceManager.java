@@ -41,8 +41,10 @@ public class YouTubeSourceManager implements AudioSourceManager {
     private volatile String[] mirrorProviders;
     private volatile boolean localDiskCache;
     private volatile String diskCachePath;
+    private volatile long maxDiskCacheMb;
     private volatile String cipherUrl;
     private final YouTubeProxyHandler proxyHandler;
+    private final com.slugyzeon.plugin.cache.SearchLruCache<AudioPlaylist> searchCache = new com.slugyzeon.plugin.cache.SearchLruCache<>(500, Duration.ofMinutes(15).toMillis());
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .connectTimeout(Duration.ofSeconds(10))
@@ -55,7 +57,7 @@ public class YouTubeSourceManager implements AudioSourceManager {
             boolean oembed,
             boolean mirror,
             Function<Void, AudioPlayerManager> audioPlayerManager) {
-        this(oembed, mirror, null, false, "youtube-cache", "https://cipher.kikkia.dev", audioPlayerManager);
+        this(oembed, mirror, null, false, "youtube-cache", "https://cipher.kikkia.dev", 0, audioPlayerManager);
     }
 
     public YouTubeSourceManager(
@@ -66,12 +68,25 @@ public class YouTubeSourceManager implements AudioSourceManager {
             String diskCachePath,
             String cipherUrl,
             Function<Void, AudioPlayerManager> audioPlayerManager) {
+        this(oembed, mirror, mirrorProviders, localDiskCache, diskCachePath, cipherUrl, 0, audioPlayerManager);
+    }
+
+    public YouTubeSourceManager(
+            boolean oembed,
+            boolean mirror,
+            List<String> mirrorProviders,
+            boolean localDiskCache,
+            String diskCachePath,
+            String cipherUrl,
+            long maxDiskCacheMb,
+            Function<Void, AudioPlayerManager> audioPlayerManager) {
         this.oembed = oembed;
         this.mirror = mirror;
         this.audioPlayerManager = audioPlayerManager;
         this.localDiskCache = localDiskCache;
         this.diskCachePath = diskCachePath != null && !diskCachePath.isEmpty() ? diskCachePath : "youtube-cache";
         this.cipherUrl = cipherUrl != null && !cipherUrl.isEmpty() ? cipherUrl : "https://cipher.kikkia.dev";
+        this.maxDiskCacheMb = maxDiskCacheMb;
         this.proxyHandler = new YouTubeProxyHandler(this.cipherUrl);
 
         if (mirrorProviders != null && !mirrorProviders.isEmpty()) {
@@ -107,9 +122,65 @@ public class YouTubeSourceManager implements AudioSourceManager {
                 if (deletedCount > 0) {
                     log.info("Cleared {} tracks from local cache, inactive from last 7 days.", deletedCount);
                 }
+                enforceLruDiskCacheQuota(cacheDir);
             } catch (Exception ignored) {
             }
         }, 1, 24, TimeUnit.HOURS);
+    }
+
+    public void enforceLruDiskCacheQuota(File cacheDir) {
+        if (maxDiskCacheMb <= 0 || cacheDir == null || !cacheDir.exists()) {
+            return;
+        }
+
+        try {
+            File[] files = cacheDir.listFiles();
+            if (files == null || files.length == 0) return;
+
+            long totalBytes = 0;
+            for (File file : files) {
+                if (file.isFile()) {
+                    totalBytes += file.length();
+                }
+            }
+
+            long maxBytes = maxDiskCacheMb * 1024L * 1024L;
+            if (totalBytes <= maxBytes) {
+                return;
+            }
+
+            long targetBytes = (long) (maxBytes * 0.90);
+            java.util.Arrays.sort(files, java.util.Comparator.comparingLong(File::lastModified));
+
+            int deletedFiles = 0;
+            for (File file : files) {
+                if (!file.isFile()) continue;
+                long len = file.length();
+                String name = file.getName();
+                if (file.delete()) {
+                    totalBytes -= len;
+                    deletedFiles++;
+                    if (name.endsWith(".webm") || name.endsWith(".m4a")) {
+                        String base = name.substring(0, name.lastIndexOf('.'));
+                        File sidecar = new File(cacheDir, base + ".json");
+                        if (sidecar.exists()) {
+                            totalBytes -= sidecar.length();
+                            sidecar.delete();
+                        }
+                    }
+                }
+                if (totalBytes <= targetBytes) {
+                    break;
+                }
+            }
+
+            if (deletedFiles > 0) {
+                log.info("Disk cache quota exceeded. Evicted {} oldest files down to {} MB (quota: {} MB).",
+                        deletedFiles, totalBytes / (1024 * 1024), maxDiskCacheMb);
+            }
+        } catch (Exception e) {
+            log.debug("Error while enforcing LRU disk cache quota: {}", e.getMessage());
+        }
     }
 
     private static class OembedData {
@@ -180,6 +251,17 @@ public class YouTubeSourceManager implements AudioSourceManager {
             if (this.proxyHandler != null) {
                 this.proxyHandler.setCipherUrl(cipherUrl);
             }
+        }
+    }
+
+    public long getMaxDiskCacheMb() {
+        return maxDiskCacheMb;
+    }
+
+    public void setMaxDiskCacheMb(long maxDiskCacheMb) {
+        this.maxDiskCacheMb = maxDiskCacheMb;
+        if (this.localDiskCache && this.maxDiskCacheMb > 0) {
+            enforceLruDiskCacheQuota(new File(this.diskCachePath));
         }
     }
 
@@ -308,6 +390,20 @@ public class YouTubeSourceManager implements AudioSourceManager {
             return null;
         }
 
+        boolean isSearch = reference.identifier.startsWith("ytsearch:") || reference.identifier.startsWith("ytmsearch:");
+        if (isSearch) {
+            AudioPlaylist cached = searchCache.get(reference.identifier);
+            if (cached != null) {
+                log.debug("In-memory cache hit for YouTube search query: {}", reference.identifier);
+                List<AudioTrack> clonedTracks = new ArrayList<>();
+                for (AudioTrack track : cached.getTracks()) {
+                    clonedTracks.add(track.makeClone());
+                }
+                AudioTrack selected = cached.getSelectedTrack() != null ? cached.getSelectedTrack().makeClone() : null;
+                return new BasicAudioPlaylist(cached.getName(), clonedTracks, selected, cached.isSearchResult());
+            }
+        }
+
         AudioItem result = null;
         Exception loadException = null;
 
@@ -369,7 +465,11 @@ public class YouTubeSourceManager implements AudioSourceManager {
                 AudioTrack selectedTrack = original.getSelectedTrack() != null
                         ? wrapTrack(original.getSelectedTrack())
                         : null;
-                return new BasicAudioPlaylist(original.getName(), fixedTracks, selectedTrack, original.isSearchResult());
+                BasicAudioPlaylist playlist = new BasicAudioPlaylist(original.getName(), fixedTracks, selectedTrack, original.isSearchResult());
+                if (isSearch) {
+                    searchCache.put(reference.identifier, playlist);
+                }
+                return playlist;
             }
             return result;
         }

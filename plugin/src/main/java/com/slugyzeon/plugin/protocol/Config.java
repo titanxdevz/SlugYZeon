@@ -233,5 +233,15 @@ public class Config {
         public void setCipherUrl(String cipherUrl) {
             this.cipherUrl = cipherUrl;
         }
+
+        private Long maxDiskCacheMb;
+
+        public Long getMaxDiskCacheMb() {
+            return this.maxDiskCacheMb;
+        }
+
+        public void setMaxDiskCacheMb(Long maxDiskCacheMb) {
+            this.maxDiskCacheMb = maxDiskCacheMb;
+        }
     }
 }
