@@ -196,6 +196,9 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
             if (spotifyConfig.getLocalFiles() != null) {
                 this.spotify.setLocalFiles(spotifyConfig.getLocalFiles());
             }
+            if (spotifyConfig.getCountryCode() != null && !spotifyConfig.getCountryCode().isEmpty()) {
+                this.spotify.setCountryCode(spotifyConfig.getCountryCode());
+            }
         }
 
         var pandoraConfig = config.getPandora();

@@ -154,6 +154,16 @@ public class Config {
         public void setLocalFiles(Boolean localFiles) {
             this.localFiles = localFiles;
         }
+
+        private String countryCode;
+
+        public String getCountryCode() {
+            return this.countryCode;
+        }
+
+        public void setCountryCode(String countryCode) {
+            this.countryCode = countryCode;
+        }
     }
 
     public static class PandoraConfig {
