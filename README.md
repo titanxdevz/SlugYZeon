@@ -41,7 +41,9 @@
 - **Bot & PoToken Protection** — Soft-fails blocked clients on 429s, 403s, and login/bot challenges, rotating to next available client.
 - **Region & Availability Bypass** — Retries unavailable or geo-blocked tracks with alternate region parameters before failing.
 - **Automatic Mirror Fallback** — Automatically routes failed YouTube tracks to mirror providers without surfacing errors.
-- **Spotify GraphQL API** — Zero-downtime hash rotation, asynchronous infinite pagination, bypasses rate limits.
+- **Spotify Resilient Scraper** — Embedded zero-day nuance table, embed session token fallback, HTTP/2 pipelined ISRC resolution, and dynamic GraphQL hash hot-patching.
+- **Spotify Canvas Extraction** — Resolves animated canvas MP4 video URLs for tracks via `spclient.wg.spotify.com/canvaz-cache`.
+- **Multi-Seed Recommendations** — Supports `sprec:` queries with multiple track and artist seeds (`seed_tracks=`, `seed_artists=`).
 - **Gaana Native Streaming** — Fully persistent HLS chunk buffering directly from Akamai CDN.
 - **Rich Metadata** — Returns extended playlists, ISRC codes, album/artist URLs, and preview URLs.
 - **Native Lyrics** — Built-in integration with LavaLyrics for Spotify color lyrics.
