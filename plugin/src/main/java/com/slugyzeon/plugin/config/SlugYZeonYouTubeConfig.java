@@ -3,12 +3,18 @@ package com.slugyzeon.plugin.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @ConfigurationProperties(prefix = "plugins.slugyzeon.youtube")
 @Component
 public class SlugYZeonYouTubeConfig {
 
     private boolean oembed = false;
     private boolean mirror = false;
+    private List<String> mirrorProviders;
+    private boolean localDiskCache = false;
+    private String diskCachePath = "youtube-cache";
+    private String cipherUrl = "https://cipher.kikkia.dev";
 
     public boolean isOembed() {
         return oembed;
@@ -24,5 +30,37 @@ public class SlugYZeonYouTubeConfig {
 
     public void setMirror(boolean mirror) {
         this.mirror = mirror;
+    }
+
+    public List<String> getMirrorProviders() {
+        return mirrorProviders;
+    }
+
+    public void setMirrorProviders(List<String> mirrorProviders) {
+        this.mirrorProviders = mirrorProviders;
+    }
+
+    public boolean isLocalDiskCache() {
+        return localDiskCache;
+    }
+
+    public void setLocalDiskCache(boolean localDiskCache) {
+        this.localDiskCache = localDiskCache;
+    }
+
+    public String getDiskCachePath() {
+        return diskCachePath;
+    }
+
+    public void setDiskCachePath(String diskCachePath) {
+        this.diskCachePath = diskCachePath;
+    }
+
+    public String getCipherUrl() {
+        return cipherUrl;
+    }
+
+    public void setCipherUrl(String cipherUrl) {
+        this.cipherUrl = cipherUrl;
     }
 }

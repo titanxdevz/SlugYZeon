@@ -12,9 +12,13 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.Collections;
+import java.util.List;
 import com.slugyzeon.plugin.protocol.Config;
 
 @Service
@@ -90,7 +94,15 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
         }
         if (sourcesConfig.isYoutube()) {
             if (hasNewYoutubeSource()) {
-                this.youtube = new YouTubeSourceManager(youtubeConfig.isOembed(), youtubeConfig.isMirror(), unused -> manager);
+                this.youtube = new YouTubeSourceManager(
+                    youtubeConfig.isOembed(),
+                    youtubeConfig.isMirror(),
+                    youtubeConfig.getMirrorProviders(),
+                    youtubeConfig.isLocalDiskCache(),
+                    youtubeConfig.getDiskCachePath(),
+                    youtubeConfig.getCipherUrl(),
+                    unused -> manager
+                );
             } else {
                 throw new IllegalStateException("SlugYZeon Youtube Source requires the new Youtube Source plugin to be enabled.");
             }
@@ -192,5 +204,38 @@ public class SlugYZeonPlugin implements AudioPlayerManagerConfiguration {
                 this.pandora.setSearchLimit(pandoraConfig.getSearchLimit());
             }
         }
+
+        var ytConfig = config.getYoutube();
+        if (ytConfig != null && this.youtube != null) {
+            if (ytConfig.getOembed() != null) {
+                this.youtube.setOembed(ytConfig.getOembed());
+            }
+            if (ytConfig.getMirror() != null) {
+                this.youtube.setMirror(ytConfig.getMirror());
+            }
+            if (ytConfig.getMirrorProviders() != null && !ytConfig.getMirrorProviders().isEmpty()) {
+                this.youtube.setMirrorProviders(ytConfig.getMirrorProviders());
+            }
+            if (ytConfig.getLocalDiskCache() != null) {
+                this.youtube.setLocalDiskCache(ytConfig.getLocalDiskCache());
+            }
+            if (ytConfig.getDiskCachePath() != null && !ytConfig.getDiskCachePath().isEmpty()) {
+                this.youtube.setDiskCachePath(ytConfig.getDiskCachePath());
+            }
+            if (ytConfig.getCipherUrl() != null && !ytConfig.getCipherUrl().isEmpty()) {
+                this.youtube.setCipherUrl(ytConfig.getCipherUrl());
+            }
+        }
+    }
+
+    @GetMapping("/v4/slugyzeon/youtube/suggest")
+    public List<String> getSearchSuggestions(
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "q", required = false) String q) {
+        String searchQuery = (query != null && !query.trim().isEmpty()) ? query : q;
+        if (searchQuery != null && !searchQuery.trim().isEmpty() && this.youtube != null && this.youtube.getProxyHandler() != null) {
+            return this.youtube.getProxyHandler().getSearchSuggestions(searchQuery);
+        }
+        return Collections.emptyList();
     }
 }

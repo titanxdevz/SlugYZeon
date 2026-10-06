@@ -171,6 +171,10 @@ public class Config {
     public static class YouTubeConfig {
         private Boolean oembed;
         private Boolean mirror;
+        private java.util.List<String> mirrorProviders;
+        private Boolean localDiskCache;
+        private String diskCachePath;
+        private String cipherUrl;
 
         public Boolean getOembed() {
             return this.oembed;
@@ -186,6 +190,38 @@ public class Config {
 
         public void setMirror(Boolean mirror) {
             this.mirror = mirror;
+        }
+
+        public java.util.List<String> getMirrorProviders() {
+            return this.mirrorProviders;
+        }
+
+        public void setMirrorProviders(java.util.List<String> mirrorProviders) {
+            this.mirrorProviders = mirrorProviders;
+        }
+
+        public Boolean getLocalDiskCache() {
+            return this.localDiskCache;
+        }
+
+        public void setLocalDiskCache(Boolean localDiskCache) {
+            this.localDiskCache = localDiskCache;
+        }
+
+        public String getDiskCachePath() {
+            return this.diskCachePath;
+        }
+
+        public void setDiskCachePath(String diskCachePath) {
+            this.diskCachePath = diskCachePath;
+        }
+
+        public String getCipherUrl() {
+            return this.cipherUrl;
+        }
+
+        public void setCipherUrl(String cipherUrl) {
+            this.cipherUrl = cipherUrl;
         }
     }
 }
