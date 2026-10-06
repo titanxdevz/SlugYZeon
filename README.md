@@ -100,10 +100,11 @@ plugins:
         - "scsearch:%QUERY%"
       localDiskCache: false # Enable local disk caching for streamed audio
       diskCachePath: "youtube-cache" # Directory path for local audio cache
+      maxDiskCacheMb: 10240 # Max local cache size in MB (0 = disabled); automatically evicts oldest tracks when exceeded
       cipherUrl: "https://cipher.kikkia.dev" # External cipher decryption service endpoint
     spotify:
       spDc: "your spDc cookie" # Required to fetch lyrics (works with free or premium accounts)
-      countryCode: "US" # the country code for filtering artist top tracks
+      countryCode: "US" # the country code for filtering artist top tracks and primary playability
       playlistLoadLimit: 6 # The number of pages at 100 tracks each
       albumLoadLimit: 6 # The number of pages at 50 tracks each
       resolveArtistsInSearch: true # Whether to resolve artists in track search results
@@ -157,6 +158,7 @@ You can dynamically update your configuration at runtime without restarting Lava
     "mirrorProviders": ["scsearch:%QUERY%"],
     "localDiskCache": true,
     "diskCachePath": "youtube-cache",
+    "maxDiskCacheMb": 10240,
     "cipherUrl": "https://cipher.kikkia.dev"
   }
 }
