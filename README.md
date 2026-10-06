@@ -2,6 +2,7 @@
 [![](https://img.shields.io/badge/Lavalink-4.0+-7289DA?style=for-the-badge)](https://github.com/lavalink-devs/Lavalink)
 [![](https://img.shields.io/badge/License-Apache_2.0-764ba2?style=for-the-badge)](LICENSE)
 [![](https://img.shields.io/badge/Sources-8-667eea?style=for-the-badge)](#sources)
+[![](https://img.shields.io/badge/Recommendations-Smart-FF6F61?style=for-the-badge)](#recommendation-api)
 [![](https://img.shields.io/badge/HTTP_Deps-Zero-00C853?style=for-the-badge)](#features)
 
 # SlugYZeon
@@ -16,6 +17,7 @@
     * [What is Mirroring?](#what-is-mirroring)
 * [Lavalink Usage](#lavalink-usage)
     * [Configuration](#configuration)
+* [Recommendation API](#recommendation-api)
 * [Supported URLs and Queries](#supported-urls-and-queries)
 * [Credits](#credits)
 
@@ -35,6 +37,7 @@
 - **Gaana Native Streaming** — Fully persistent HLS chunk buffering directly from Akamai CDN.
 - **Rich Metadata** — Returns extended playlists, ISRC codes, album/artist URLs, and preview URLs.
 - **Native Lyrics** — Built-in integration with LavaLyrics for Spotify color lyrics.
+- **Smart Recommendations** — Source-aware recommendation engine using Spotify Radio, YouTube RD Mix, and Last.fm audioscrobbler.
 - **Zero HTTP Dependencies** — Relies entirely on Java's native `HttpClient` for maximal performance.
 - **Seamless Integration** — Plugs directly into standard Lavalink 4.0+ via spring boot.
 
@@ -103,6 +106,8 @@ plugins:
     pandora:
       csrfToken: "your csrftoken" # Manual CSRF cookie from pandora.com (Only works if node is hosted inside the US)
       searchLimit: 6
+    lastfm:
+      apiKey: "your last.fm api key" # Optional: enables Last.fm audioscrobbler for recommendation enrichment
 ```
 
 ### Live Configuration Updates
@@ -132,6 +137,78 @@ You can dynamically update your configuration at runtime without restarting Lava
   "pandora": {
     "searchLimit": 6
   }
+}
+```
+
+---
+
+## Recommendation API
+
+SlugYZeon provides a built-in recommendation endpoint that intelligently selects the best recommendation strategy based on the source of the currently playing track.
+
+### Endpoint
+
+```
+GET /v4/sessions/{sessionId}/players/{guildId}/recommendation
+```
+
+### Query Parameters
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `track`   | No       | —       | Base64 encoded track. If omitted, uses the currently playing track. |
+| `limit`   | No       | `10`    | Maximum number of recommended tracks to return. |
+
+### Resolution Strategy
+
+The recommendation engine automatically selects the best source based on the seed track:
+
+| Seed Source | Primary Method | Fallback |
+|-------------|----------------|----------|
+| Spotify     | Spotify GQL Radio (`sprec:`) | Last.fm Similar Tracks |
+| YouTube     | YouTube RD Mix (`list=RD`) | Last.fm → Spotify Search |
+| Other       | Last.fm Similar Tracks | Spotify Search Fallback |
+
+### Example Request
+
+```bash
+# Recommendations for the currently playing track
+curl -X GET "http://localhost:2333/v4/sessions/{sessionId}/players/{guildId}/recommendation" \
+     -H "Authorization: youshallnotpass"
+
+# Recommendations with custom limit
+curl -X GET "http://localhost:2333/v4/sessions/{sessionId}/players/{guildId}/recommendation?limit=5" \
+     -H "Authorization: youshallnotpass"
+
+# Recommendations for a specific encoded track
+curl -X GET "http://localhost:2333/v4/sessions/{sessionId}/players/{guildId}/recommendation?track=ENCODED_TRACK" \
+     -H "Authorization: youshallnotpass"
+```
+
+### Example Response
+
+```json
+{
+  "source": "spotify",
+  "seed": "Shape of You - Ed Sheeran",
+  "tracks": [
+    {
+      "encoded": "QAAAs...",
+      "info": {
+        "identifier": "7qiZfU4dY1lWllzX7mPBI3",
+        "title": "Perfect",
+        "author": "Ed Sheeran",
+        "length": 263400,
+        "isStream": false,
+        "uri": "https://open.spotify.com/track/...",
+        "artworkUrl": "https://i.scdn.co/image/...",
+        "isrc": "GBAHS1700XXX",
+        "sourceName": "spotify",
+        "position": 0
+      }
+    }
+  ],
+  "total": 10
 }
 ```
 
