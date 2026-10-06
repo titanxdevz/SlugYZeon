@@ -56,6 +56,9 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
             "mix:(?<seedType>album|artist|track|isrc):(?<seed>[a-zA-Z0-9-_]+)");
 
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.6998.178 Spotify/1.2.65.255 Safari/537.36";
+    private static final String[] FALLBACK_MARKETS = { "US", "GB", "IN", "DE", "JP" };
+    private final com.slugyzeon.plugin.cache.SearchLruCache<AudioPlaylist> searchCache =
+            new com.slugyzeon.plugin.cache.SearchLruCache<>(500, Duration.ofMinutes(15).toMillis());
 
     private final SpotifyTokenTracker tokenTracker;
     private volatile String countryCode;
@@ -483,23 +486,126 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
 
     public AudioItem getTrack(String id, boolean preview) throws IOException {
         JsonNode data = gqlQuery(SpotifyRequestPayload.track(id));
-        if (data == null)
-            return AudioReference.NO_TRACK;
+        JsonNode track = null;
+        if (data != null) {
+            track = data.path("trackUnion");
+            if (track.isMissingNode())
+                track = data.path("trackV2");
+            if (track.isMissingNode())
+                track = data.path("track");
+        }
 
-        JsonNode track = data.path("trackUnion");
-        if (track.isMissingNode())
-            track = data.path("trackV2");
-        if (track.isMissingNode())
-            track = data.path("track");
-        if (track.isMissingNode())
-            return AudioReference.NO_TRACK;
+        if (track == null || track.isMissingNode()) {
+            AudioTrack fallback = resolveTrackWithFallbackMarkets(id, preview);
+            return fallback != null ? fallback : AudioReference.NO_TRACK;
+        }
+
+        boolean isPlayable = track.path("playability").path("playable").asBoolean(true);
+        if (!isPlayable) {
+            AudioTrack fallback = resolveTrackWithFallbackMarkets(id, preview);
+            if (fallback != null) {
+                return fallback;
+            }
+        }
 
         java.util.Map<String, String> isrcMap = fetchIsrcMap(List.of(id));
         String canvasUrl = getCanvas(id);
         return parseGqlTrackWithIsrc(track, id, preview, isrcMap.get(id), canvasUrl);
     }
 
+    private AudioTrack resolveTrackWithFallbackMarkets(String trackId, boolean preview) {
+        String hexId = base62ToHex(trackId);
+        if (hexId == null) {
+            return null;
+        }
+
+        String token;
+        try {
+            token = getToken();
+        } catch (IOException e) {
+            return null;
+        }
+
+        for (String market : FALLBACK_MARKETS) {
+            if (market.equalsIgnoreCase(this.countryCode)) {
+                continue;
+            }
+
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(SPCLIENT_BASE + hexId + "?market=" + market))
+                        .timeout(Duration.ofSeconds(10))
+                        .header("Authorization", "Bearer " + token)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Accept", "application/json")
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200 && response.body() != null) {
+                    JsonNode json = mapper.readTree(response.body());
+                    if (json == null || json.isMissingNode()) continue;
+
+                    String title = json.path("name").asText(null);
+                    if (title == null || title.isEmpty()) continue;
+
+                    String artistName = "Unknown";
+                    JsonNode artists = json.path("artist");
+                    if (artists.isArray() && artists.size() > 0) {
+                        artistName = artists.get(0).path("name").asText("Unknown");
+                    }
+
+                    long duration = json.path("duration").asLong(0);
+
+                    String isrc = null;
+                    JsonNode externalIds = json.path("external_id");
+                    if (externalIds.isArray()) {
+                        for (JsonNode ext : externalIds) {
+                            if ("isrc".equals(ext.path("type").asText(null))) {
+                                isrc = ext.path("id").asText(null);
+                                break;
+                            }
+                        }
+                    }
+
+                    String trackUrl = "https://open.spotify.com/track/" + trackId;
+                    String fileId = json.path("album").path("cover_group").path("image").path(0).path("file_id").asText(null);
+                    String artworkUrl = (fileId != null && !fileId.isEmpty()) ? "https://i.scdn.co/image/" + fileId : null;
+                    String albumName = json.path("album").path("name").asText(null);
+
+                    AudioTrackInfo info = new AudioTrackInfo(
+                            title,
+                            artistName,
+                            preview ? PREVIEW_LENGTH : duration,
+                            trackId,
+                            false,
+                            trackUrl,
+                            artworkUrl,
+                            isrc);
+
+                    String canvasUrl = getCanvas(trackId);
+                    log.debug("Track {} resolved via fallback market {}", trackId, market);
+                    return new SpotifyAudioTrack(info, albumName, null, null, null, null, preview, canvasUrl, this);
+                }
+            } catch (Exception e) {
+                log.debug("Failed resolving track {} in fallback market {}: {}", trackId, market, e.getMessage());
+            }
+        }
+        return null;
+    }
+
     public AudioItem getSearch(String query, boolean preview) throws IOException {
+        String cacheKey = (preview ? "prev:" : "") + query;
+        AudioPlaylist cached = searchCache.get(cacheKey);
+        if (cached != null) {
+            log.debug("In-memory cache hit for Spotify search query: {}", query);
+            List<AudioTrack> clonedTracks = new ArrayList<>();
+            for (AudioTrack track : cached.getTracks()) {
+                clonedTracks.add(track.makeClone());
+            }
+            return new BasicAudioPlaylist(cached.getName(), clonedTracks, null, true);
+        }
+
         JsonNode data = gqlQuery(SpotifyRequestPayload.search(query));
         if (data == null)
             return AudioReference.NO_TRACK;
@@ -534,7 +640,9 @@ public class SpotifyAudioSourceManager extends MirroringAudioSourceManager imple
 
         if (tracks.isEmpty())
             return AudioReference.NO_TRACK;
-        return new BasicAudioPlaylist("Spotify Search: " + query, tracks, null, true);
+        BasicAudioPlaylist playlist = new BasicAudioPlaylist("Spotify Search: " + query, tracks, null, true);
+        searchCache.put(cacheKey, playlist);
+        return playlist;
     }
 
     public AudioItem getRecommendations(String query, boolean preview) throws IOException {
