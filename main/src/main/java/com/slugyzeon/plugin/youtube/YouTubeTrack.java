@@ -108,10 +108,10 @@ public class YouTubeTrack extends DelegatedAudioTrack {
 
         if (fallback != null) {
             try {
-                processDelegate(fallback, executor);
                 if (sourceManager.isLocalDiskCache()) {
                     triggerBackgroundCache();
                 }
+                processDelegate(fallback, executor);
                 return;
             } catch (Exception e) {
                 directException = e;
@@ -151,7 +151,11 @@ public class YouTubeTrack extends DelegatedAudioTrack {
 
         File partFile = new File(file.getParentFile(), file.getName() + ".part");
         if (partFile.exists()) {
-            return false;
+            if (System.currentTimeMillis() - partFile.lastModified() > Duration.ofMinutes(5).toMillis()) {
+                partFile.delete();
+            } else {
+                return false;
+            }
         }
 
         try (FileInputStream fis = new FileInputStream(file)) {
