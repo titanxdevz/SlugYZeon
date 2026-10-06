@@ -359,17 +359,22 @@ Licensed under the **Apache License 2.0**.
 
 See [LICENSE](LICENSE) for full details.
 
+### Notice & Derivative Work
+This project is an enhanced distribution originally derived from [SlugYZeon](https://github.com/xylen-py/SlugYZeon) by xylen-py.
+Maintained and hardened by **Nex Devz** under the Apache License 2.0 with key enhancements:
+- High-throughput Thread-Safe In-Memory LRU Search Cache (`< 1ms`).
+- Automated Disk Quota auto-eviction preventing disk saturation crashes.
+- Resilient Multi-Market Spotify Failover Ring for geo-restricted tracks.
+- Spring Boot 3.2+ explicit reflection parameter compatibility.
+
 ---
 
 <div align="center">
 
 <br>
 
-<b>built by <a href="https://github.com/xylen-py">xylen</a> — draxity engine</b>
-
-<br>
-
-`.1xylen SlugYZeon v4.0.0 - Lavalink`
+<b>Maintained & Enhanced by <a href="https://github.com/titanxdevz">Nex Devz</a></b>  
+<sub>Originally created by xylen-py — Apache License 2.0</sub>
 
 <br><br>
 
